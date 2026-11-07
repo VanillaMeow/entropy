@@ -1,9 +1,7 @@
 app-id: io.github.jedace07.Entropy
-runtime: org.kde.Platform
-runtime-version: '6.11'
-sdk: org.kde.Sdk
-base: io.qt.PySide.BaseApp
-base-version: '6.11'
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
 command: entropy
 
 finish-args:
@@ -23,7 +21,6 @@ build-options:
     UV_OFFLINE: '1'
     UV_PYTHON_DOWNLOADS: never
     UV_NO_CACHE: '1'
-    BASEAPP_REMOVE_WEBENGINE: '1'
     LDFLAGS: -Wl,-z,noexecstack
 
 cleanup:
@@ -32,8 +29,6 @@ cleanup:
   - /share/man
   - '*.a'
   - '*.la'
-cleanup-commands:
-  - /app/cleanup-BaseApp.sh
 
 modules:
   - uv.yaml
@@ -68,11 +63,30 @@ modules:
       - type: patch
         path: mnn-runtime-loaders.patch
 
+  # The PySide6 wheels' Qt Network library links against MIT Kerberos.
+  - name: krb5
+    buildsystem: autotools
+    subdir: src
+    builddir: true
+    config-opts:
+      - --disable-static
+      - --disable-rpath
+      - --without-system-verto
+    cleanup:
+      - /bin
+      - /sbin
+      - /share
+      - /var
+    sources:
+      - type: archive
+        url: https://kerberos.org/dist/krb5/1.22/krb5-1.22.2.tar.gz
+        sha256: 3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13
+      - type: patch
+        path: krb5-c23.patch
+
   - name: entropy
     buildsystem: simple
     build-commands:
-      # The upstream BaseApp cleanup uses pip; keep cleanup file-based instead.
-      - sed -i '/^[[:space:]]*pip uninstall /s/.*/:/' /app/cleanup-BaseApp.sh
       - uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index --no-deps --no-build-isolation .
       - install -Dm644 realesr-general-x4v3.mnn /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.mnn
       - install -Dm644 src/licenses/Real-ESRGAN.txt /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.license.txt

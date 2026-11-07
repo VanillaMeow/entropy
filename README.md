@@ -6,8 +6,10 @@ There is no model file picker or manual model configuration.
 
 ## Run
 
-Python 3.11–3.14 and [uv](https://docs.astral.sh/uv/) are supported. Linux is the
-currently tested platform.
+Python 3.14 is required and selected by `.python-version`. Python 3.15 support
+is deferred until MNN publishes a compatible wheel. Use
+[uv](https://docs.astral.sh/uv/) to manage the environment. Linux is the currently
+tested platform.
 
 ```bash
 uv sync
@@ -118,16 +120,17 @@ scales above 4×, installers and Windows GPU validation are not included.
 
 ## Flatpak
 
-The YAML manifest is `flatpak/io.github.jedace07.Entropy.yaml`. It uses the KDE
-6.11 runtime and PySide BaseApp, builds the pinned MNN runtime with OpenCL and
-Vulkan, and bundles the verified enhancement model. Python dependencies are
-downloaded from the pinned sources in `flatpak/python-dependencies.yaml`.
+The YAML manifest is `flatpak/io.github.jedace07.Entropy.yaml`. It uses the
+Freedesktop 26.08 runtime with Python 3.14, bundles PySide6 wheels, builds the
+pinned MNN runtime with OpenCL and Vulkan, and bundles the verified enhancement
+model. Python dependencies are downloaded from the pinned sources in
+`flatpak/python-dependencies.yaml`.
 The build bootstraps a pinned uv executable from `flatpak/uv.yaml` and uses
 `uv pip install` to install into `/app`; compilation and installation run offline.
 
 Use the Flatpak-packaged builder. From the repository root, install it from
-Flathub, then build and install. The builder installs the required runtime,
-SDK, and BaseApp system-wide:
+Flathub, then build and install. The builder installs the required runtime
+and SDK system-wide:
 
 ```bash
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -138,7 +141,7 @@ flatpak run io.github.jedace07.Entropy
 
 All build dependencies and the resulting app use the system installation.
 Omit `--install` to build and export locally without installing the app.
-The manifest includes Python 3.13 wheels for x86_64 and aarch64. To export a
+The manifest includes Python 3.14 wheels for x86_64 and aarch64. To export a
 single-file bundle after building:
 
 ```bash
@@ -193,7 +196,7 @@ UPSCALER_TEST_GPU=1 uv run pytest tests/test_gpu.py -v
 
 These tests require the GPU runtime and drivers, and install the pinned model if
 it is not cached. They check dynamic tile inference, output dimensions and pixel
-sanity. CI covers Python 3.11 and 3.14; GPU tests are opt-in because hosted runners
+sanity. CI covers Python 3.14; GPU tests are opt-in because hosted runners
 lack the required GPU hardware. Weekly dependency updates are configured.
 
 Local validation on Aurora 44 with an RTX 3080 and Intel UHD 750: both real-model

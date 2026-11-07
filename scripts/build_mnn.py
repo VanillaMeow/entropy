@@ -102,7 +102,7 @@ def main() -> int:
             python,
             "setuptools==84.2.1",
             "wheel==0.48.0",
-            "numpy>=2.1,<3",
+            "numpy>=2.5.4,<3",
         ]
     )
     build = source / "pymnn_build"

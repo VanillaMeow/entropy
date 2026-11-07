@@ -87,7 +87,7 @@ class AppController(QObject):
         self._padding = int(self._settings.value("padding", 16))
         try:
             self._output_scale = float(self._settings.value("outputScale", 4.0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._output_scale = 4.0
         if not 0.1 <= self._output_scale <= 4.0:
             self._output_scale = 4.0
