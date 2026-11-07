@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from placeholder_upscaler.config import Backend, ModelProfile, UpscaleRequest
+from src.config import Backend, ModelProfile, UpscaleRequest
 
 
 @pytest.mark.parametrize(

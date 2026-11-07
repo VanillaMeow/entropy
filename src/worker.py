@@ -14,10 +14,10 @@ from typing import Any
 
 from PIL import Image
 
-from placeholder_upscaler.config import UpscaleRequest
-from placeholder_upscaler.engine import MnnRunner, available_backends, import_mnn
-from placeholder_upscaler.imaging import load_image, save_output, upscale_image
-from placeholder_upscaler.models import ensure_default_model
+from .config import UpscaleRequest
+from .engine import MnnRunner, available_backends, import_mnn
+from .imaging import load_image, save_output, upscale_image
+from .models import ensure_default_model
 
 EVENT_PREFIX = "@upscaler@"
 logger = logging.getLogger(__name__)

@@ -20,12 +20,12 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtQml import QmlElement, QmlUncreatable
 
-from placeholder_upscaler.config import Backend, UpscaleRequest
-from placeholder_upscaler.imaging import SUPPORTED_SUFFIXES
-from placeholder_upscaler.models import DEFAULT_PROFILE
-from placeholder_upscaler.preview import image_aspect, preview_url
-from placeholder_upscaler.process import WorkerProcess
-from placeholder_upscaler.queue import ImageQueue
+from .config import Backend, UpscaleRequest
+from .imaging import SUPPORTED_SUFFIXES
+from .models import DEFAULT_PROFILE
+from .preview import image_aspect, preview_url
+from .process import WorkerProcess
+from .queue import ImageQueue
 
 QML_IMPORT_NAME = "Upscaler.Backend"
 QML_IMPORT_MAJOR_VERSION = 1

@@ -15,9 +15,9 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 
-from placeholder_upscaler.app import create_engine  # noqa: E402
-from placeholder_upscaler.controller import AppController  # noqa: E402
-from placeholder_upscaler.process import WorkerProcess  # noqa: E402
+from src.app import create_engine  # noqa: E402
+from src.controller import AppController  # noqa: E402
+from src.process import WorkerProcess  # noqa: E402
 
 
 @pytest.fixture(scope="module")

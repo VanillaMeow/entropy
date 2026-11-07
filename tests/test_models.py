@@ -7,7 +7,7 @@ from urllib.error import URLError
 
 import pytest
 
-from placeholder_upscaler import models
+from src import models
 
 
 class Download(BytesIO):

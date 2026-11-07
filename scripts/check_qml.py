@@ -15,7 +15,7 @@ def main() -> int:
     parser.add_argument("--format", action="store_true", help="Format QML source files in place")
     options = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
-    package = project / "src" / "placeholder_upscaler"
+    package = project / "src"
     qml = package / "qml"
     foreign = (
         Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PrefixPath))

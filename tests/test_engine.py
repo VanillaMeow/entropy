@@ -7,9 +7,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from placeholder_upscaler import engine
-from placeholder_upscaler.config import Backend, ModelProfile
-from placeholder_upscaler.engine import InferenceError, MnnRunner
+from src import engine
+from src.config import Backend, ModelProfile
+from src.engine import InferenceError, MnnRunner
 
 
 def test_unavailable_gpu_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

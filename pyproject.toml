@@ -22,14 +22,15 @@ mnn = ["MNN>=3.6.2,<4"]
 dev = ["pytest>=8.3,<10", "ruff>=0.11"]
 
 [project.scripts]
-entropy = "placeholder_upscaler:main"
+entropy = "src:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "placeholder_upscaler"
+module-name = "src"
+module-root = ""
 
 [tool.ruff]
 target-version = "py311"

@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from placeholder_upscaler.engine import FloatImage
-from placeholder_upscaler.imaging import load_image, save_output, upscale_image
+from src.engine import FloatImage
+from src.imaging import load_image, save_output, upscale_image
 
 
 class NearestRunner:

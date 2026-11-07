@@ -37,39 +37,6 @@ from `.venv`. Normal `uv sync` does not remove it. The app prefers this runtime
 on subsequent worker launches, including after refreshing GPU setup.
 Changing Python minor versions requires rebuilding for that Python ABI.
 
-## Why Vulkan and OpenCL were unavailable
-
-The system drivers work: `vulkaninfo --summary` enumerates the RTX 3080 and Intel
-UHD 750, and `clinfo --list` enumerates both GPUs. Two MNN issues caused the failure:
-
-1. The standard MNN 3.6.2 Linux wheel was built without OpenCL and Vulkan.
-2. A GPU-enabled build of MNN 3.6.2 searches for `libOpenCL.so` and `libvulkan.so`.
-   This system provides the runtime SONAMEs `libOpenCL.so.1` and `libvulkan.so.1`;
-   unversioned names usually come from development packages.
-
-The build helper pins MNN to commit
-`7e3c6fb5225d3ccf22807ee641332669df34650d` (3.6.2), enables both GPU backends, and
-patches their Linux loaders to try the runtime SONAMEs. It also consistently uses
-strict C++11 for GCC 16 compatibility and links with a non-executable stack to
-avoid the executable-stack loading error found in the original PyPI wheel.
-
-OpenCL and Vulkan runtime loaders and device drivers must still be installed.
-MNN selects the device; OpenCL may use the first platform's integrated GPU on
-multi-GPU systems. There is no GPU device picker yet. Unsupported individual
-operations can still execute on CPU inside an MNN GPU session.
-
-Diagnostics:
-
-```bash
-vulkaninfo --summary
-clinfo --list
-uv run python -m placeholder_upscaler.worker --probe
-```
-
-The app's details panel includes the actual imported MNN runtime path, native
-logs and setup errors. The optional `uv sync --extra mnn` installs the standard
-PyPI wheel for CPU integration testing; it does not enable GPU support.
-
 ## Default model
 
 The app uses `realesr-general-x4v3`, a compact general-purpose Real-ESRGAN model
@@ -86,7 +53,7 @@ The download is pinned to conversion commit
 Downloads use a scratch file and are published only after verifying the exact
 size and SHA-256. Every reuse checks the cached file's integrity. Corrupt files
 are downloaded again; valid files work offline. No images are uploaded. The
-[Real-ESRGAN license](src/placeholder_upscaler/licenses/Real-ESRGAN.txt) is included
+[Real-ESRGAN license](src/licenses/Real-ESRGAN.txt) is included
 and copied alongside the downloaded model.
 
 On Linux, persistent files normally live under

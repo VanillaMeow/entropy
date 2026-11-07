@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageOps
 
-from placeholder_upscaler.engine import TileRunner
+from .engine import TileRunner
 
 SUPPORTED_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp"})
 

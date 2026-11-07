@@ -3,6 +3,6 @@
 
 def main() -> int:
     """Start the desktop application."""
-    from placeholder_upscaler.app import run
+    from .app import run
 
     return run()

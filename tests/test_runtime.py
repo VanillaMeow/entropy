@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from placeholder_upscaler import runtime
+from src import runtime
 
 
 def test_no_local_runtime_leaves_import_path_unchanged(

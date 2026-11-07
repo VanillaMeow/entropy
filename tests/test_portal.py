@@ -19,9 +19,9 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, QTimer, QObject, QMetaObject, Qt, Q_ARG
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuickControls2 import QQuickStyle
-from placeholder_upscaler.dialogs import configure_file_portal
-from placeholder_upscaler.controller import AppController
-from placeholder_upscaler.app import create_engine
+from src.dialogs import configure_file_portal
+from src.controller import AppController
+from src.app import create_engine
 
 configure_file_portal()
 QQuickStyle.setStyle("Material")

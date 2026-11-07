@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from placeholder_upscaler import dialogs
+from src import dialogs
 
 
 def test_linux_selects_portal_theme(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

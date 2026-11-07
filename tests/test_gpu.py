@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from placeholder_upscaler.config import Backend
-from placeholder_upscaler.engine import MnnRunner, available_backends, import_mnn
-from placeholder_upscaler.imaging import upscale_image
-from placeholder_upscaler.models import DEFAULT_PROFILE, ensure_default_model
+from src.config import Backend
+from src.engine import MnnRunner, available_backends, import_mnn
+from src.imaging import upscale_image
+from src.models import DEFAULT_PROFILE, ensure_default_model
 
 
 @pytest.mark.skipif(

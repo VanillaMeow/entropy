@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from platformdirs import user_cache_path
 
-from placeholder_upscaler.paths import runtime_root
+from src.paths import runtime_root
 
 MNN_VERSION = "3.6.2"
 MNN_COMMIT = "7e3c6fb5225d3ccf22807ee641332669df34650d"

@@ -6,7 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, QUrl, Signal
 
-from placeholder_upscaler.preview import preview_url
+from .preview import preview_url
 
 
 @dataclass

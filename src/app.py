@@ -8,9 +8,9 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
-from placeholder_upscaler.controller import AppController
-from placeholder_upscaler.dialogs import configure_file_portal
-from placeholder_upscaler.preview import PreviewProvider
+from .controller import AppController
+from .dialogs import configure_file_portal
+from .preview import PreviewProvider
 
 
 def create_engine(controller: AppController) -> QQmlApplicationEngine:

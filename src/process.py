@@ -6,7 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
-from placeholder_upscaler.worker import EVENT_PREFIX
+from .worker import EVENT_PREFIX
 
 
 class WorkerProcess(QObject):
@@ -46,7 +46,7 @@ class WorkerProcess(QObject):
         process.readyReadStandardError.connect(self._read_stderr)
         process.finished.connect(self._on_finished)
         process.errorOccurred.connect(self._on_error)
-        process.start(sys.executable, ["-u", "-m", "placeholder_upscaler.worker", argument])
+        process.start(sys.executable, ["-u", "-m", f"{__package__}.worker", argument])
         if argument == "--probe":
             self._probe_timeout.start(30000)
 

@@ -6,7 +6,7 @@ from importlib import invalidate_caches
 from pathlib import Path
 from typing import Any
 
-from placeholder_upscaler.paths import runtime_root
+from .paths import runtime_root
 
 
 def activate_local_runtime() -> dict[str, Any] | None:

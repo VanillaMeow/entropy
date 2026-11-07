@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from placeholder_upscaler import worker
-from placeholder_upscaler.config import ModelProfile, UpscaleRequest
-from placeholder_upscaler.engine import FloatImage
+from src import worker
+from src.config import ModelProfile, UpscaleRequest
+from src.engine import FloatImage
 
 
 def test_batch_continues_after_corrupt_image(

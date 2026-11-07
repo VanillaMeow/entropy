@@ -9,8 +9,8 @@ from tempfile import NamedTemporaryFile
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from placeholder_upscaler.config import ModelProfile
-from placeholder_upscaler.paths import data_dir
+from .config import ModelProfile
+from .paths import data_dir
 
 
 @dataclass(frozen=True)
@@ -79,9 +79,7 @@ def ensure_default_model(
         if count != artifact.size or digest.hexdigest() != artifact.sha256:
             raise ModelInstallError("The model download failed its integrity check. Please retry.")
         license_text = (
-            files("placeholder_upscaler")
-            .joinpath("licenses/Real-ESRGAN.txt")
-            .read_text(encoding="utf-8")
+            files(__package__).joinpath("licenses/Real-ESRGAN.txt").read_text(encoding="utf-8")
         )
         destination.with_suffix(".license.txt").write_text(license_text, encoding="utf-8")
         scratch.replace(destination)

@@ -6,8 +6,8 @@ from typing import Any, Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from placeholder_upscaler.config import Backend, ModelProfile
-from placeholder_upscaler.runtime import activate_local_runtime
+from .config import Backend, ModelProfile
+from .runtime import activate_local_runtime
 
 FloatImage = NDArray[np.float32]
 
