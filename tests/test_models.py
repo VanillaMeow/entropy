@@ -80,3 +80,43 @@ def test_network_failure_is_actionable(
     monkeypatch.setattr(models, "urlopen", offline)
     with pytest.raises(models.ModelInstallError, match="Check your connection and retry"):
         models.ensure_default_model(directory=tmp_path)
+
+
+def test_bundled_model_works_without_network_or_writable_storage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, artifact: bytes
+) -> None:
+    bundled = tmp_path / f"test-model-{models.DEFAULT_MODEL.sha256[:12]}.mnn"
+    bundled.write_bytes(artifact)
+    monkeypatch.setenv("ENTROPY_MODEL_DIR", str(tmp_path))
+
+    def unexpected_access(*_: object, **__: object) -> None:
+        pytest.fail("A bundled model must not access the network or user storage")
+
+    monkeypatch.setattr(models, "urlopen", unexpected_access)
+    monkeypatch.setattr(models, "data_dir", unexpected_access)
+    assert models.ensure_default_model() == bundled
+
+
+@pytest.mark.parametrize("payload", [None, b"corrupt"])
+def test_missing_or_damaged_bundle_does_not_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, artifact: bytes, payload: bytes | None
+) -> None:
+    if payload is not None:
+        (tmp_path / f"test-model-{models.DEFAULT_MODEL.sha256[:12]}.mnn").write_bytes(payload)
+    monkeypatch.setenv("ENTROPY_MODEL_DIR", str(tmp_path))
+
+    def unexpected_download(*_: object, **__: object) -> None:
+        pytest.fail("A damaged bundled model must not trigger a download")
+
+    monkeypatch.setattr(models, "urlopen", unexpected_download)
+    with pytest.raises(models.ModelInstallError, match="Reinstall Entropy"):
+        models.ensure_default_model()
+
+
+def test_explicit_model_directory_takes_precedence_over_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, artifact: bytes
+) -> None:
+    monkeypatch.setenv("ENTROPY_MODEL_DIR", str(tmp_path / "missing-bundle"))
+    monkeypatch.setattr(models, "urlopen", lambda *_, **__: Download(artifact))
+    path = models.ensure_default_model(directory=tmp_path / "cache")
+    assert path.read_bytes() == artifact

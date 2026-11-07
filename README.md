@@ -116,6 +116,44 @@ per side. RGB color profiles are retained without explicit color conversion;
 non-RGB input profiles are dropped after Pillow's RGB conversion. HDR, video,
 scales above 4×, installers and Windows GPU validation are not included.
 
+## Flatpak
+
+The YAML manifest is `flatpak/io.github.jedace07.Entropy.yaml`. It uses the KDE
+6.11 runtime and PySide BaseApp, builds the pinned MNN runtime with OpenCL and
+Vulkan, and bundles the verified enhancement model. Python dependencies are
+downloaded from the pinned sources in `flatpak/python-dependencies.yaml`.
+The build bootstraps a pinned uv executable from `flatpak/uv.yaml` and uses
+`uv pip install` to install into `/app`; compilation and installation run offline.
+
+Use the Flatpak-packaged builder. From the repository root, install it from
+Flathub, then build and install. The builder installs the required runtime,
+SDK, and BaseApp system-wide:
+
+```bash
+flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --system flathub org.flatpak.Builder
+flatpak run org.flatpak.Builder --system --install-deps-from=flathub --force-clean --jobs=4 --repo=flatpak-repo --install flatpak-build flatpak/io.github.jedace07.Entropy.yaml
+flatpak run io.github.jedace07.Entropy
+```
+
+All build dependencies and the resulting app use the system installation.
+Omit `--install` to build and export locally without installing the app.
+The manifest includes Python 3.13 wheels for x86_64 and aarch64. To export a
+single-file bundle after building:
+
+```bash
+flatpak build-bundle flatpak-repo entropy.flatpak io.github.jedace07.Entropy
+```
+
+Filesystem access is read/write for the home directory, `/mnt`, `/media`, and
+`/run/media`. Other permissions are limited to GPU rendering and compute,
+Wayland, fallback X11, and shared IPC for X11. File pickers and opening output
+folders use portals. The sandbox has no network, audio, unrestricted device,
+or unrestricted D-Bus permissions. The bundled model makes offline startup
+and processing possible without a host Python environment or a user-built MNN
+runtime. Host GPU drivers must still be available through Flatpak's graphics
+extensions; OpenCL availability depends on the driver's support in the sandbox.
+
 ## Development
 
 ```bash

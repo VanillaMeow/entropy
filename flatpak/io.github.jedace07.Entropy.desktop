@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Entropy
+Comment=Upscale and resize images locally
+Exec=entropy
+Icon=io.github.jedace07.Entropy
+Terminal=false
+Categories=Graphics;RasterGraphics;
+Keywords=image;upscale;resize;Real-ESRGAN;
+StartupNotify=true

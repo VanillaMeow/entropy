@@ -1,6 +1,7 @@
 """Install the pinned default enhancement model automatically and verify its bytes."""
 
 import hashlib
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.resources import files
@@ -49,6 +50,15 @@ def ensure_default_model(
     offline. Concurrent instances may download twice but only publish valid bytes.
     """
     artifact = DEFAULT_MODEL
+    bundled_directory = os.environ.get("ENTROPY_MODEL_DIR") if directory is None else None
+    if bundled_directory:
+        bundled = Path(bundled_directory) / f"{artifact.name}-{artifact.sha256[:12]}.mnn"
+        try:
+            if bundled.is_file() and _valid_file(bundled, artifact):
+                return bundled
+        except OSError as exc:
+            raise ModelInstallError("Could not read the bundled enhancement model.") from exc
+        raise ModelInstallError("The bundled enhancement model is damaged. Reinstall Entropy.")
     directory = directory if directory is not None else data_dir() / "models"
     destination = directory / f"{artifact.name}-{artifact.sha256[:12]}.mnn"
     scratch: Path | None = None

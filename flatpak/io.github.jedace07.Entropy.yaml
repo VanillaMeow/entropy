@@ -1,0 +1,97 @@
+app-id: io.github.jedace07.Entropy
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: entropy
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  - --filesystem=home:rw
+  - --filesystem=/mnt:rw
+  - --filesystem=/media:rw
+  - --filesystem=/run/media:rw
+  - --env=ENTROPY_MODEL_DIR=/app/share/entropy/models
+  - --env=OCL_ICD_VENDORS=/app/etc/OpenCL/vendors
+
+build-options:
+  env:
+    UV_OFFLINE: '1'
+    UV_PYTHON_DOWNLOADS: never
+    UV_NO_CACHE: '1'
+    BASEAPP_REMOVE_WEBENGINE: '1'
+    LDFLAGS: -Wl,-z,noexecstack
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - '*.a'
+  - '*.la'
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+
+modules:
+  - uv.yaml
+  - python-dependencies.yaml
+
+  - name: mnn
+    buildsystem: simple
+    build-commands:
+      - >-
+        cmake -S . -B pymnn_build -G Ninja
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -DCMAKE_CXX_EXTENSIONS=OFF
+        -DMNN_OPENCL=ON -DMNN_VULKAN=ON -DMNN_VULKAN_IMAGE=OFF
+        -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_SEP_BUILD=OFF
+        -DMNN_BUILD_TRAIN=ON -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=OFF
+        -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON -DMNN_BUILD_AUDIO=ON
+        -DMNN_AAPL_FMWK=OFF
+        -DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,noexecstack
+        -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,noexecstack
+      - cmake --build pymnn_build --target MNN MNNTrain MNNConvertDeps --parallel "$FLATPAK_BUILDER_N_JOBS"
+      - >-
+        cd pymnn/pip_package && python3 setup.py build_ext --force bdist_wheel
+        --deps opencl,vulkan && uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index
+        --no-deps dist/mnn_vulkan_opencl-*.whl
+      - install -d /app/etc/OpenCL
+      - ln -s "/usr/lib/${FLATPAK_ARCH}-linux-gnu/GL/OpenCL/vendors" /app/etc/OpenCL/vendors
+    sources:
+      - type: git
+        url: https://github.com/alibaba/MNN.git
+        tag: '3.6.2'
+        commit: 7e3c6fb5225d3ccf22807ee641332669df34650d
+      - type: patch
+        path: mnn-runtime-loaders.patch
+
+  - name: entropy
+    buildsystem: simple
+    build-commands:
+      # The upstream BaseApp cleanup uses pip; keep cleanup file-based instead.
+      - sed -i '/^[[:space:]]*pip uninstall /s/.*/:/' /app/cleanup-BaseApp.sh
+      - uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index --no-deps --no-build-isolation .
+      - install -Dm644 realesr-general-x4v3.mnn /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.mnn
+      - install -Dm644 src/licenses/Real-ESRGAN.txt /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.license.txt
+      - install -Dm644 flatpak/io.github.jedace07.Entropy.desktop /app/share/applications/io.github.jedace07.Entropy.desktop
+      - install -Dm644 flatpak/io.github.jedace07.Entropy.svg /app/share/icons/hicolor/scalable/apps/io.github.jedace07.Entropy.svg
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - .venv
+          - .flatpak-builder
+          - .pytest_cache
+          - .ruff_cache
+          - build
+          - dist
+          - flatpak-build
+          - flatpak-repo
+      - type: file
+        url: https://raw.githubusercontent.com/Lucchetto/Real-ESRGAN-models/095c5d0cf5ae6bd23e7d6b046cac5f63e8b4ecc8/realesr-general-x4v3.mnn
+        sha256: 4a8999e30500cd550cc807b53a6af8153390aa39bdc61b2fe53b20c2141dc442
+        dest-filename: realesr-general-x4v3.mnn
