@@ -1,10 +1,10 @@
 [project]
-name = "entropy-upscaler"
+name = "entropy"
 version = "0.1.0"
 description = "Entropy: a Qt Quick image upscaler powered by MNN, OpenCL and Vulkan"
 readme = "README.md"
 authors = [
-    { name = "jedace07", email = "ivelisvale73@gmail.com" }
+    { name = "jedace07", email = "jedacev07@gmail.com" }
 ]
 requires-python = ">=3.11,<3.15"
 dependencies = [
