@@ -1,0 +1,2 @@
+module Upscaler.Backend
+typeinfo backend.qmltypes
