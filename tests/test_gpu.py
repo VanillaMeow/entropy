@@ -16,7 +16,8 @@ from placeholder_upscaler.models import DEFAULT_PROFILE, ensure_default_model
     os.environ.get("UPSCALER_TEST_GPU") != "1", reason="Set UPSCALER_TEST_GPU=1 on a GPU host"
 )
 @pytest.mark.parametrize("backend", list(Backend))
-def test_default_model_on_gpu(backend: Backend) -> None:
+@pytest.mark.parametrize("output_scale", [1.5, 2, 3, 4])
+def test_default_model_on_gpu(backend: Backend, output_scale: float) -> None:
     assert available_backends(import_mnn())[backend], f"{backend.value} must be available"
     runner = MnnRunner(str(ensure_default_model()), DEFAULT_PROFILE, backend)
     image = Image.new("RGB", (19, 13), (128, 128, 128))
@@ -25,11 +26,12 @@ def test_default_model_on_gpu(backend: Backend) -> None:
         image,
         runner,
         scale=4,
+        output_scale=output_scale,
         tile_size=16,
         padding=16,
         progress=lambda done, total: progress.append((done, total)),
     )
-    assert result.size == (76, 52)
+    assert result.size == (round(19 * output_scale), round(13 * output_scale))
     assert progress[-1] == (2, 2)
     pixels = np.asarray(result)
     # A flat mid-gray image must stay near mid-gray, including edge tiles.

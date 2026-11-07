@@ -27,3 +27,9 @@ def test_request_round_trip_and_gpu_only_contract(tmp_path: Path) -> None:
     assert Backend.VULKAN.mnn_id == 7
     with pytest.raises(ValidationError):
         UpscaleRequest.model_validate({**request.model_dump(), "backend": "CPU"})
+
+
+@pytest.mark.parametrize("scale", [0, -1, 0.09, 4.01, float("nan"), float("inf")])
+def test_invalid_output_scale_is_rejected(tmp_path: Path, scale: float) -> None:
+    with pytest.raises(ValidationError):
+        UpscaleRequest(images=(tmp_path / "a.png",), output_dir=tmp_path, output_scale=scale)

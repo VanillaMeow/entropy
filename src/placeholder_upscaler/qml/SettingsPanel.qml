@@ -22,6 +22,15 @@ Rectangle {
         ColumnLayout {
             width: scroll.availableWidth
             spacing: 12
+            ScaleSettings {
+                Layout.fillWidth: true
+                controller: root.controller
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 1
+                color: Theme.outline
+            }
             SectionLabel {
                 text: qsTr("ENHANCEMENT")
             }

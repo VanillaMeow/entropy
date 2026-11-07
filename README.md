@@ -16,7 +16,7 @@ uv run entropy
 
 On first launch, the app downloads and verifies the 4.9 MB default model. It
 shows download progress and caches the model for offline use. Add images,
-choose the output folder, select an available GPU backend, and upscale.
+choose the output size and folder, select an available GPU backend, and upscale.
 The refresh button beside **GPU processing** retries setup and checks the runtime again.
 
 On this development machine the GPU runtime has already been built and installed.
@@ -123,11 +123,17 @@ the color and typography tokens. Native inference remains in its own process.
 ## Features and limits
 
 - Batch file/folder import, drag and drop, and original/result comparison.
+- Output size presets from 0.25× to 4×, plus custom 10–400% sizing in 1% steps.
+  The default remains 4×. Scales above 1× use the 4× enhancement model followed
+  by Lanczos resizing to the chosen dimensions. At 1× or below, images are
+  resized directly without enhancement, model installation, or a GPU.
+  Dimensions round to the nearest pixel, with a minimum of one pixel per side.
 - Padded tile inference, configurable tile size/padding, progress and cancellation.
 - A separate native inference process, preserving Qt responsiveness.
 - Static PNG, JPEG, WebP, TIFF and BMP input; 8-bit RGB/RGBA PNG output.
 - EXIF orientation and alpha preservation. Alpha uses Lanczos interpolation.
-- Existing files are preserved: `photo_4x.png`, `photo_4x_1.png`, etc.
+- Filenames reflect the chosen scale, such as `photo_1.5x.png` or `photo_0.5x.png`.
+  Existing files are preserved: `photo_4x.png`, `photo_4x_1.png`, etc.
 
 Folder import is non-recursive. Animated/multipage images are rejected. Output
 publication uses exclusive hard links and therefore needs a filesystem supporting
@@ -141,7 +147,7 @@ RAM. Smaller tiles help with GPU memory pressure. Padding reduces seams but is
 not a guarantee of full-frame equivalence. Previews are limited to 2048 pixels
 per side. RGB color profiles are retained without explicit color conversion;
 non-RGB input profiles are dropped after Pillow's RGB conversion. HDR, video,
-other enlargement factors, installers and Windows GPU validation are not included.
+scales above 4×, installers and Windows GPU validation are not included.
 
 ## Development
 

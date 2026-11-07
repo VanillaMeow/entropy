@@ -9,7 +9,7 @@ from PIL import Image
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
-from PySide6.QtCore import QEventLoop, QObject, QPointF, QSettings, QTimer  # noqa: E402
+from PySide6.QtCore import QEventLoop, QObject, QPointF, QSettings, Qt, QTimer  # noqa: E402
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 from PySide6.QtQuick import QQuickItem, QQuickWindow  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
@@ -113,9 +113,114 @@ def test_batch_uses_default_model_and_locks_settings(
     controller.startBatch()
     assert controller._request.model_path is None
     assert controller._request.profile.scale == 4
+    assert controller._request.output_scale == 4
     assert starts
     controller._finished(0, True)
     controller.shutdown()
+
+
+def test_scale_controls_accept_presets_and_custom_percent(
+    qt_app: QGuiApplication, controller: AppController, tmp_path: Path
+) -> None:
+    make_ready(controller, tmp_path)
+    engine = create_engine(controller)
+    window = engine.rootObjects()[0]
+    warnings = []
+    engine.warnings.connect(
+        lambda messages: warnings.extend(message.toString() for message in messages)
+    )
+    presets = window.findChild(QQuickItem, "scalePresets")
+    percent = window.findChild(QQuickItem, "scalePercent")
+    assert presets.property("currentIndex") == 7
+    presets.forceActiveFocus()
+    QTest.keyClick(window, Qt.Key.Key_Up)
+    assert controller.outputScale == 3
+    assert percent.property("value") == 300
+    percent.forceActiveFocus()
+    QTest.keyClick(window, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+    for key in [Qt.Key.Key_1, Qt.Key.Key_3, Qt.Key.Key_7]:
+        QTest.keyClick(window, key)
+    QTest.keyClick(window, Qt.Key.Key_Return)
+    assert controller.outputScale == 1.37
+    assert presets.property("currentIndex") == -1
+    controller.outputScale = 0.5
+    assert percent.property("value") == 50
+    assert presets.property("currentIndex") == 1
+    assert window.findChild(QObject, "upscaleButton").property("text") == "Downscale image"
+    controller._handle_event(
+        {
+            "event": "saved",
+            "index": 0,
+            "output": str(tmp_path / "result.png"),
+            "output_scale": 0.5,
+        }
+    )
+    controller.outputScale = 4
+    assert window.findChild(QObject, "resultScaleLabel").property("text") == "Result · 0.5×"
+    assert not warnings, warnings
+    window.close()
+    engine.deleteLater()
+    qt_app.processEvents()
+
+
+@pytest.mark.parametrize("scale", [0.5, 1.25, 2, 3])
+def test_scale_is_snapshotted_and_preserved_with_result(
+    controller: AppController, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scale: float
+) -> None:
+    make_ready(controller, tmp_path)
+    controller.outputScale = scale
+    monkeypatch.setattr(controller._worker, "start", lambda _: None)
+    controller.startBatch()
+    assert controller._request.output_scale == scale
+    assert controller._request.profile.scale == 4
+    controller._handle_event(
+        {
+            "event": "saved",
+            "index": 0,
+            "output": str(tmp_path / "result.png"),
+            "output_scale": scale,
+        }
+    )
+    controller._finished(0, False)
+    controller.outputScale = 4
+    assert controller.resultScale == scale
+    controller.outputScale = scale
+    controller.shutdown()
+    restored = AppController(settings=controller._settings, start_setup=False)
+    assert restored.outputScale == scale
+
+
+def test_downscale_needs_no_model_or_gpu(controller: AppController, tmp_path: Path) -> None:
+    image = tmp_path / "input.png"
+    Image.new("RGB", (10, 10)).save(image)
+    controller.add_paths([image])
+    assert not controller.canStart
+    controller.outputScale = 0.5
+    assert controller.canStart
+    controller.outputScale = 1
+    assert controller.canStart
+    controller.outputScale = 1.01
+    assert not controller.canStart
+
+
+def test_scale_validation_and_busy_lock(controller: AppController) -> None:
+    controller.outputScale = 1.5
+    for invalid in [0, -1, 0.09, 4.01, float("nan"), float("inf")]:
+        controller.outputScale = invalid
+        assert controller.outputScale == 1.5
+    controller._worker._process = QObject()
+    try:
+        controller.outputScale = 2
+        assert controller.outputScale == 1.5
+    finally:
+        controller._worker._process = None
+
+
+@pytest.mark.parametrize("stored", ["broken", "nan", "inf", "0", "5"])
+def test_invalid_saved_scale_uses_default(controller: AppController, stored: str) -> None:
+    controller._settings.setValue("outputScale", stored)
+    restored = AppController(settings=controller._settings, start_setup=False)
+    assert restored.outputScale == 4
 
 
 def test_urls_from_portal_and_drops(controller: AppController, tmp_path: Path) -> None:

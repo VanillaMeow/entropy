@@ -126,7 +126,9 @@ Rectangle {
                 Accessible.name: qsTr("Original and enhanced comparison")
             }
             Label {
-                text: qsTr("Enhanced · 4×")
+                objectName: "resultScaleLabel"
+                text: qsTr("Result · %1×").arg(Number(root.controller.resultScale).toLocaleString(
+                                                   Qt.locale(), 'g', 3))
                 color: Theme.accent
                 font.pointSize: Theme.caption
             }

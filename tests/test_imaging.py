@@ -46,6 +46,49 @@ def test_alpha_is_preserved(mode: str) -> None:
     np.testing.assert_array_equal(np.asarray(result.getchannel("A")), np.asarray(expected))
 
 
+@pytest.mark.parametrize("output_scale", [0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4])
+@pytest.mark.parametrize("mode", ["RGB", "RGBA", "LA", "P", "CMYK"])
+def test_custom_output_sizes_and_metadata(output_scale: float, mode: str) -> None:
+    image = Image.new("RGBA", (19, 11), (100, 150, 200, 80)).convert(mode)
+    if mode == "P":
+        image.info["transparency"] = 0
+    image.info["icc_profile"] = b"test profile"
+    result = upscale_image(
+        image,
+        NearestRunner() if output_scale > 1 else None,
+        scale=2,
+        output_scale=output_scale,
+        tile_size=16,
+        padding=4,
+        progress=lambda *_: None,
+    )
+    assert result.size == (max(1, round(19 * output_scale)), max(1, round(11 * output_scale)))
+    assert result.info.get("icc_profile") == (
+        b"test profile" if mode in {"RGB", "RGBA", "P"} else None
+    )
+    if image.has_transparency_data:
+        expected = (
+            image.convert("RGBA").getchannel("A").resize(result.size, Image.Resampling.LANCZOS)
+        )
+        assert result.mode == "RGBA"
+        np.testing.assert_array_equal(result.getchannel("A"), expected)
+    else:
+        assert result.mode == "RGB"
+
+
+def test_tiny_downscale_stays_at_least_one_pixel() -> None:
+    result = upscale_image(
+        Image.new("RGB", (1, 2)),
+        None,
+        scale=4,
+        output_scale=0.1,
+        tile_size=16,
+        padding=0,
+        progress=lambda *_: None,
+    )
+    assert result.size == (1, 1)
+
+
 def test_loading_applies_exif_orientation(tmp_path: Path) -> None:
     path = tmp_path / "rotated.png"
     image = Image.new("RGB", (3, 5))

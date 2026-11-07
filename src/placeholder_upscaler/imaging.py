@@ -13,20 +13,53 @@ SUPPORTED_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff
 
 def upscale_image(
     image: Image.Image,
-    runner: TileRunner,
+    runner: TileRunner | None,
     *,
     scale: int,
     tile_size: int,
     padding: int,
     progress: Callable[[int, int], None],
+    output_scale: float | None = None,
 ) -> Image.Image:
-    """Upscale padded tiles, cropping context so each output pixel is written once.
+    """Enhance padded tiles and resize to the requested output scale.
 
     Input is EXIF-oriented before this function. Alpha is resized separately;
     inference always sees normalized RGB. Output is an 8-bit RGB/RGBA image.
+    Scales at or below 1 bypass inference. Dimensions round to the nearest
+    pixel with a minimum of one pixel per side. Omit output_scale to retain
+    the model's native scale.
     Tile padding reduces seams but cannot guarantee equivalence to full-frame
     inference for models with large receptive fields or global operations.
     """
+    final_scale = scale if output_scale is None else output_scale
+    if final_scale <= 1:
+        output = image.convert("RGB")
+        output.info.clear()
+        progress(1, 1)
+    else:
+        if runner is None:
+            raise ValueError("An enhancement model is required for upscaling.")
+        output = _upscale_rgb(image, runner, scale, tile_size, padding, progress)
+    size = tuple(max(1, round(dimension * final_scale)) for dimension in image.size)
+    if output.size != size:
+        output = output.resize(size, Image.Resampling.LANCZOS)
+    if image.has_transparency_data:
+        alpha = image.convert("RGBA").getchannel("A")
+        output.putalpha(alpha.resize(output.size, Image.Resampling.LANCZOS))
+    # Non-RGB profiles (for example CMYK JPEG) cannot tag an RGB PNG unchanged.
+    if image.mode in {"RGB", "RGBA", "P"} and "icc_profile" in image.info:
+        output.info["icc_profile"] = image.info["icc_profile"]
+    return output
+
+
+def _upscale_rgb(
+    image: Image.Image,
+    runner: TileRunner,
+    scale: int,
+    tile_size: int,
+    padding: int,
+    progress: Callable[[int, int], None],
+) -> Image.Image:
     width, height = image.size
     output = Image.new("RGB", (width * scale, height * scale))
     total = ((width + tile_size - 1) // tile_size) * ((height + tile_size - 1) // tile_size)
@@ -52,12 +85,6 @@ def upscale_image(
             output.paste(tile, (left * scale, top * scale))
             completed += 1
             progress(completed, total)
-    if image.has_transparency_data:
-        alpha = image.convert("RGBA").getchannel("A")
-        output.putalpha(alpha.resize(output.size, Image.Resampling.LANCZOS))
-    # Non-RGB profiles (for example CMYK JPEG) cannot tag an RGB PNG unchanged.
-    if image.mode in {"RGB", "RGBA", "P"} and "icc_profile" in image.info:
-        output.info["icc_profile"] = image.info["icc_profile"]
     return output
 
 
@@ -72,7 +99,7 @@ def load_image(path: Path) -> Image.Image:
 
 
 def save_output(
-    image: Image.Image, source: Path, output_dir: Path, scale: int, staging_path: Path
+    image: Image.Image, source: Path, output_dir: Path, scale: float, staging_path: Path
 ) -> Path:
     """Publish a complete PNG using an exclusive hard link; never overwrite a file.
 
@@ -84,7 +111,7 @@ def save_output(
         with staging_path.open("xb") as stream:
             created = True
             image.save(stream, format="PNG", icc_profile=image.info.get("icc_profile"))
-        stem = f"{source.stem}_{scale}x"
+        stem = f"{source.stem}_{scale:g}x"
         number = 0
         while True:
             suffix = f"_{number}" if number else ""

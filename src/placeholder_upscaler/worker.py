@@ -30,12 +30,14 @@ def emit(event: str, **payload: Any) -> None:
 
 def run_batch(request: UpscaleRequest) -> int:
     """Process a batch sequentially and report individual failures honestly."""
-    model_path = request.model_path or _prepare_model()
-    if not model_path.is_file() or model_path.suffix.lower() != ".mnn":
-        raise ValueError("The enhancement model is missing. Retry model installation.")
     request.output_dir.mkdir(parents=True, exist_ok=True)
-    emit("status", message=f"Initializing {request.backend.value}…")
-    runner = MnnRunner(str(model_path), request.profile, request.backend)
+    runner = None
+    if request.output_scale > 1:
+        model_path = request.model_path or _prepare_model()
+        if not model_path.is_file() or model_path.suffix.lower() != ".mnn":
+            raise ValueError("The enhancement model is missing. Retry model installation.")
+        emit("status", message=f"Initializing {request.backend.value}…")
+        runner = MnnRunner(str(model_path), request.profile, request.backend)
     failed = 0
     for index, path in enumerate(request.images):
         emit("started", index=index, source=str(path))
@@ -45,14 +47,21 @@ def run_batch(request: UpscaleRequest) -> int:
                 image,
                 runner,
                 scale=request.profile.scale,
+                output_scale=request.output_scale,
                 tile_size=request.tile_size,
                 padding=request.padding,
                 progress=partial(_tile_progress, index),
             )
             destination = save_output(
-                result, path, request.output_dir, request.profile.scale, request.staging_path
+                result, path, request.output_dir, request.output_scale, request.staging_path
             )
-            emit("saved", index=index, source=str(path), output=str(destination))
+            emit(
+                "saved",
+                index=index,
+                source=str(path),
+                output=str(destination),
+                output_scale=request.output_scale,
+            )
         except Exception as exc:
             # This is a process boundary: keep the batch running but mark failures.
             logger.exception("Failed to upscale %s", path)

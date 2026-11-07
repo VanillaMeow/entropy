@@ -16,6 +16,7 @@ class QueueEntry:
     path: Path
     state: str = "Ready"
     output: Path | None = None
+    output_scale: float | None = None
     error: str = ""
 
 
@@ -87,10 +88,17 @@ class ImageQueue(QAbstractListModel):
         self.changed.emit()
 
     def update_entry(
-        self, row: int, *, state: str, output: Path | None = None, error: str = ""
+        self,
+        row: int,
+        *,
+        state: str,
+        output: Path | None = None,
+        output_scale: float | None = None,
+        error: str = "",
     ) -> None:
         """Publish processing changes for exactly one delegate."""
         entry = self.entries[row]
         entry.state, entry.output, entry.error = state, output, error
+        entry.output_scale = output_scale
         index = self.index(row)
         self.dataChanged.emit(index, index, list(self._roles))

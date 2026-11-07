@@ -50,6 +50,7 @@ class UpscaleRequest(BaseModel):
     model_path: Path | None = None
     output_dir: Path
     profile: ModelProfile = Field(default_factory=ModelProfile)
+    output_scale: float = Field(default=4.0, ge=0.1, le=4.0, allow_inf_nan=False)
     backend: Backend = Backend.OPENCL
     tile_size: int = Field(default=128, ge=16, le=1024)
     padding: int = Field(default=16, ge=0, le=128)

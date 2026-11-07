@@ -176,11 +176,19 @@ Module {
             isReadonly: true
         }
         Property {
+            name: "resultScale"
+            type: "double"
+            read: "resultScale"
+            notify: "selectionChanged"
+            index: 20
+            isReadonly: true
+        }
+        Property {
             name: "previewAspect"
             type: "double"
             read: "previewAspect"
             notify: "selectionChanged"
-            index: 20
+            index: 21
             isReadonly: true
         }
         Property {
@@ -189,14 +197,14 @@ Module {
             read: "outputDirectory"
             write: "outputDirectory"
             notify: "settingsChanged"
-            index: 21
+            index: 22
         }
         Property {
             name: "originalPreviewUrl"
             type: "QUrl"
             read: "originalPreviewUrl"
             notify: "selectionChanged"
-            index: 22
+            index: 23
             isReadonly: true
         }
         Property {
@@ -204,7 +212,7 @@ Module {
             type: "QUrl"
             read: "outputUrl"
             notify: "settingsChanged"
-            index: 23
+            index: 24
             isReadonly: true
         }
         Property {
@@ -213,7 +221,15 @@ Module {
             read: "backend"
             write: "backend"
             notify: "settingsChanged"
-            index: 24
+            index: 25
+        }
+        Property {
+            name: "outputScale"
+            type: "double"
+            read: "outputScale"
+            write: "outputScale"
+            notify: "settingsChanged"
+            index: 26
         }
         Property {
             name: "tileSize"
@@ -221,7 +237,7 @@ Module {
             read: "tileSize"
             write: "tileSize"
             notify: "settingsChanged"
-            index: 25
+            index: 27
         }
         Property {
             name: "padding"
@@ -229,7 +245,7 @@ Module {
             read: "padding"
             write: "padding"
             notify: "settingsChanged"
-            index: 26
+            index: 28
         }
         Property {
             name: "darkTheme"
@@ -237,7 +253,7 @@ Module {
             read: "darkTheme"
             write: "darkTheme"
             notify: "settingsChanged"
-            index: 27
+            index: 29
         }
         Signal { name: "stateChanged" }
         Signal { name: "settingsChanged" }

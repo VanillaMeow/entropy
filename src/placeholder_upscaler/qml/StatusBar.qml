@@ -58,9 +58,15 @@ Rectangle {
             objectName: "upscaleButton"
             primary: true
             symbol: "arrow"
-            text: root.controller.queueCount > 1 ? qsTr("Upscale %1 images").arg(
-                                                       root.controller.queueCount) : qsTr(
-                                                       "Upscale image")
+            text: {
+                const count = root.controller.queueCount;
+                if (root.controller.outputScale < 1)
+                    return count > 1 ? qsTr("Downscale %1 images").arg(count) : qsTr(
+                                           "Downscale image");
+                if (root.controller.outputScale === 1)
+                    return count > 1 ? qsTr("Resize %1 images").arg(count) : qsTr("Resize image");
+                return count > 1 ? qsTr("Upscale %1 images").arg(count) : qsTr("Upscale image");
+            }
             enabled: root.controller.canStart
             onClicked: root.controller.startBatch()
         }

@@ -85,6 +85,12 @@ class AppController(QObject):
             self._backend = Backend.VULKAN.value
         self._tile = int(self._settings.value("tileSize", 128))
         self._padding = int(self._settings.value("padding", 16))
+        try:
+            self._output_scale = float(self._settings.value("outputScale", 4.0))
+        except (TypeError, ValueError):
+            self._output_scale = 4.0
+        if not 0.1 <= self._output_scale <= 4.0:
+            self._output_scale = 4.0
         default_dark = QGuiApplication.styleHints().colorScheme() != Qt.ColorScheme.Light
         self._dark = self._settings.value("darkTheme", default_dark, type=bool)
         if start_setup:
@@ -119,9 +125,11 @@ class AppController(QObject):
         return (
             not self.busy
             and self._queue.count > 0
-            and self._model_ready
             and bool(self._output.strip())
-            and self._backends.get(self._backend, False)
+            and (
+                self._output_scale <= 1
+                or (self._model_ready and self._backends.get(self._backend, False))
+            )
         )
 
     @Property(str, notify=stateChanged)
@@ -182,6 +190,12 @@ class AppController(QObject):
         return self._selected >= 0 and self._queue.entries[self._selected].output is not None
 
     @Property("double", notify=selectionChanged)
+    def resultScale(self) -> float:
+        if self._selected < 0:
+            return 4.0
+        return self._queue.entries[self._selected].output_scale or 4.0
+
+    @Property("double", notify=selectionChanged)
     def previewAspect(self) -> float:
         return image_aspect(
             self._queue.entries[self._selected].path if self._selected >= 0 else None
@@ -216,6 +230,17 @@ class AppController(QObject):
     def backend(self, value: str) -> None:
         if self.canEdit and value in {b.value for b in Backend} and value != self._backend:
             self._backend = value
+            self.settingsChanged.emit()
+            self.stateChanged.emit()
+
+    @Property("double", notify=settingsChanged)
+    def outputScale(self) -> float:
+        return self._output_scale
+
+    @outputScale.setter
+    def outputScale(self, value: float) -> None:
+        if self.canEdit and 0.1 <= value <= 4.0 and value != self._output_scale:
+            self._output_scale = value
             self.settingsChanged.emit()
             self.stateChanged.emit()
 
@@ -343,6 +368,7 @@ class AppController(QObject):
                 images=tuple(entry.path for entry in self._queue.entries),
                 output_dir=Path(self._output).expanduser().resolve(),
                 profile=DEFAULT_PROFILE,
+                output_scale=self._output_scale,
                 backend=Backend(self._backend),
                 tile_size=self._tile,
                 padding=self._padding,
@@ -362,7 +388,11 @@ class AppController(QObject):
             self._queue.update_entry(row, state="Queued")
         self.selectionChanged.emit()
         self._progress, self._indeterminate = 0.0, True
-        self._status = self.tr("Warming up the GPU…")
+        self._status = (
+            self.tr("Resizing images…")
+            if request.output_scale <= 1
+            else self.tr("Warming up the GPU…")
+        )
         self._start_time = time.monotonic()
         self._worker.start(str(job))
         self.stateChanged.emit()
@@ -426,7 +456,7 @@ class AppController(QObject):
             self._status = event["message"]
         elif kind == "started":
             self._queue.update_entry(event["index"], state="Processing")
-            self._status = self.tr("Upscaling {name}…").format(name=Path(event["source"]).name)
+            self._status = self.tr("Processing {name}…").format(name=Path(event["source"]).name)
         elif kind == "progress" and self._request:
             self._indeterminate = False
             self._progress = (event["index"] + event["done"] / event["total"]) / len(
@@ -443,7 +473,12 @@ class AppController(QObject):
                 seconds=max(1, round(remaining)),
             )
         elif kind == "saved":
-            self._queue.update_entry(event["index"], state="Done", output=Path(event["output"]))
+            self._queue.update_entry(
+                event["index"],
+                state="Done",
+                output=Path(event["output"]),
+                output_scale=event.get("output_scale", 4.0),
+            )
             self._log(f"Saved: {event['output']}")
             self.selectionChanged.emit()
         elif kind == "image_error":
@@ -501,6 +536,7 @@ class AppController(QObject):
             ("backend", self._backend),
             ("tileSize", self._tile),
             ("padding", self._padding),
+            ("outputScale", self._output_scale),
             ("darkTheme", self._dark),
         ):
             self._settings.setValue(key, value)
