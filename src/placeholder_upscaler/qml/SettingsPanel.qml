@@ -31,49 +31,6 @@ Rectangle {
                 implicitHeight: 1
                 color: Theme.outline
             }
-            SectionLabel {
-                text: qsTr("ENHANCEMENT")
-            }
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 90
-                radius: 12
-                color: Theme.accentSurface
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 14
-                    Label {
-                        text: qsTr("4×")
-                        color: Theme.accent
-                        font.pointSize: Theme.title
-                        font.weight: Font.Medium
-                    }
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("General enhancement")
-                            color: Theme.text
-                            wrapMode: Text.WordWrap
-                            font.pointSize: Theme.body
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: root.controller.modelStatus
-                            color: Theme.muted
-                            wrapMode: Text.WordWrap
-                            font.pointSize: Theme.caption
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: Theme.outline
-            }
             RowLayout {
                 Layout.fillWidth: true
                 SectionLabel {
