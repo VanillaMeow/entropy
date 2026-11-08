@@ -9,7 +9,8 @@ There is no model file picker or manual model configuration.
 Python 3.14 is required and selected by `.python-version`. Python 3.15 support
 is deferred until MNN publishes a compatible wheel. Use
 [uv](https://docs.astral.sh/uv/) to manage the environment. Linux is the currently
-tested platform.
+tested platform. The runtime build helper also supports Windows x64 with MSVC;
+native Windows GPU validation is still pending.
 
 ```bash
 uv sync
@@ -22,7 +23,7 @@ choose the output size and folder, select an available GPU backend, and upscale.
 The refresh button beside **GPU processing** retries setup and checks the runtime again.
 
 On this development machine the GPU runtime has already been built and installed.
-For a fresh Linux installation, build it once:
+For a fresh Linux or Windows installation, build it once:
 
 ```bash
 uv run python scripts/build_mnn.py
@@ -33,6 +34,24 @@ The build needs `git`, `cmake`, `ninja`, a C++ compiler and internet access. It
 uses uv-managed Python development headers and a separate build environment.
 Compilation can take several minutes; `--jobs 4` limits parallel compilation.
 Neither root privileges nor system-wide library modifications are required.
+
+On Windows, install Visual Studio 2022 Build Tools with **Desktop development
+with C++** and a Windows SDK, plus uv, Git, CMake and Ninja. Open the **x64 Native
+Tools Command Prompt for VS 2022**, change to the repository directory, then run:
+
+```bat
+uv sync
+uv run python scripts/build_mnn.py --jobs 4
+uv run entropy
+```
+
+Use x64 Python 3.14 and the x64 toolchain. The helper builds both OpenCL and Vulkan
+into a static MNN runtime and installs the Python extension for the app; the
+standard MNN wheel is not a substitute for this GPU build. Install current GPU
+drivers providing OpenCL and/or Vulkan. A separate OpenCL or Vulkan SDK is not
+required. Qt uses its native Windows file dialogs, and output folders must be
+on a filesystem with hard-link support, such as NTFS; FAT32/exFAT are unsupported.
+macOS runtime builds are not enabled yet.
 
 The runtime is installed in the user's application data directory, separately
 from `.venv`. Normal `uv sync` does not remove it. The app prefers this runtime
@@ -63,6 +82,7 @@ On Linux, persistent files normally live under
 per-Python native packages. Entropy retains this original storage location and
 settings identity so existing models, GPU runtimes, and preferences remain available
 after the rename. XDG application-data overrides are respected.
+On Windows the same data lives under `%LOCALAPPDATA%\placeholder-upscaler\`.
 
 ## Interface and native file selection
 

@@ -7,6 +7,7 @@ installed system-wide or into the application's uv-managed site-packages.
 import argparse
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -57,13 +58,28 @@ def main() -> int:
     parser.add_argument("--jobs", type=int, default=min(8, os.cpu_count() or 2))
     parser.add_argument("--source", type=Path, help="Reuse an existing pinned MNN source checkout")
     args = parser.parse_args()
-    if sys.platform != "linux":
-        parser.error("This build helper currently supports Linux.")
+    if sys.platform not in {"linux", "win32"}:
+        parser.error("This build helper supports Linux and Windows; macOS is not yet supported.")
+    windows = sys.platform == "win32"
+    if windows and (platform.machine().lower() not in {"amd64", "x86_64"} or sys.maxsize <= 2**32):
+        parser.error("Windows builds require x64 Python and an x64 MSVC toolchain.")
+    if windows and os.environ.get("VSCMD_ARG_TGT_ARCH", "x64").lower() != "x64":
+        parser.error("Run this helper from the x64 Native Tools Command Prompt for Visual Studio.")
     if args.jobs < 1:
         parser.error("--jobs must be positive")
-    for tool in ("uv", "git", "cmake", "ninja", "c++"):
+    for tool in ("uv", "git", "cmake", "ninja"):
         if shutil.which(tool) is None:
             parser.error(f"Required build tool is missing: {tool}")
+    if windows:
+        for tool in ("cl", "link", "rc"):
+            if shutil.which(tool) is None:
+                parser.error(
+                    f"Required MSVC/Windows SDK tool is missing: {tool}. Install Visual Studio "
+                    "Build Tools with Desktop development with C++ and a Windows SDK, then run "
+                    "from the x64 Native Tools Command Prompt for Visual Studio."
+                )
+    elif shutil.which("c++") is None:
+        parser.error("Required build tool is missing: c++")
 
     version = f"{sys.version_info.major}.{sys.version_info.minor}"
     cache = user_cache_path("placeholder-upscaler", appauthor=False) / f"mnn-{MNN_VERSION}"
@@ -85,14 +101,16 @@ def main() -> int:
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
     if commit != MNN_COMMIT:
         raise RuntimeError(f"Unexpected MNN source revision: {commit}; expected {MNN_COMMIT}")
-    patch_linux_loaders(source)
+    if not windows:
+        patch_linux_loaders(source)
 
     # A uv-managed Python includes development headers, unlike many OS installs.
     run(["uv", "python", "install", version])
     build_env = cache / f"build-env-{version}"
-    if not (build_env / "bin" / "python").is_file():
+    python_path = build_env / "Scripts" / "python.exe" if windows else build_env / "bin" / "python"
+    if not python_path.is_file():
         run(["uv", "venv", "--python", version, "--managed-python", str(build_env)])
-    python = str(build_env / "bin" / "python")
+    python = str(python_path)
     run(
         [
             "uv",
@@ -106,6 +124,18 @@ def main() -> int:
         ]
     )
     build = source / "pymnn_build"
+    if windows:
+        # Match upstream setup.py's /MT extension and protobuf's static runtime.
+        platform_options = [
+            "-DCMAKE_C_COMPILER=cl",
+            "-DCMAKE_CXX_COMPILER=cl",
+            "-DMNN_WIN_RUNTIME_MT=ON",
+        ]
+    else:
+        platform_options = [
+            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,noexecstack",
+            "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,noexecstack",
+        ]
     run(
         [
             "cmake",
@@ -131,8 +161,7 @@ def main() -> int:
             "-DMNN_IMGCODECS=ON",
             "-DMNN_BUILD_AUDIO=ON",
             "-DMNN_AAPL_FMWK=OFF",
-            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,noexecstack",
-            "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,noexecstack",
+            *platform_options,
         ]
     )
     run(
@@ -150,7 +179,11 @@ def main() -> int:
     )
     package = source / "pymnn" / "pip_package"
     build_settings = os.environ.copy()
-    build_settings["LDFLAGS"] = "-Wl,-z,noexecstack"
+    if windows:
+        # Use the same initialized MSVC environment for CMake and setuptools.
+        build_settings["DISTUTILS_USE_SDK"] = "1"
+    else:
+        build_settings["LDFLAGS"] = "-Wl,-z,noexecstack"
     run(
         [python, "setup.py", "build_ext", "--force", "bdist_wheel", "--deps", "opencl,vulkan"],
         cwd=package,
@@ -198,7 +231,7 @@ def main() -> int:
                 "version": MNN_VERSION,
                 "source_commit": MNN_COMMIT,
                 "compiled_backends": ["OpenCL", "Vulkan"],
-                "linux_runtime_sonames": True,
+                "linux_runtime_sonames": not windows,
             },
             indent=2,
         ),
