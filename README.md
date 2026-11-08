@@ -12,6 +12,10 @@ is deferred until MNN publishes a compatible wheel. Use
 tested platform. The runtime build helper also supports Windows x64 with MSVC;
 native Windows GPU validation is still pending.
 
+For the portable Windows release, download `entropy-windows-x86_64.zip`, extract
+the entire archive, and open `Entropy/Entropy.cmd`. It includes Python, the GPU
+runtime and the enhancement model; only a compatible GPU driver is required.
+
 ```bash
 uv sync
 uv run entropy
@@ -168,20 +172,6 @@ single-file bundle after building:
 flatpak build-bundle flatpak-repo entropy.flatpak io.github.jedace07.Entropy
 ```
 
-### Automated builds and releases
-
-Push a version tag such as `v0.1.0` to build the x86_64 Flatpak and publish it
-as `entropy-x86_64.flatpak` on a GitHub Release with generated release notes.
-You can also run **Publish Flatpak** manually from the Actions tab to download
-a build artifact without creating a release. Ordinary pushes and pull requests
-do not run a workflow.
-
-Install a downloaded bundle with:
-
-```bash
-flatpak install --user entropy-x86_64.flatpak
-```
-
 Filesystem access is read/write for the home directory, `/mnt`, `/media`, and
 `/run/media`. Other permissions are limited to GPU rendering and compute,
 Wayland, fallback X11, and shared IPC for X11. File pickers and opening output
@@ -190,6 +180,31 @@ or unrestricted D-Bus permissions. The bundled model makes offline startup
 and processing possible without a host Python environment or a user-built MNN
 runtime. Host GPU drivers must still be available through Flatpak's graphics
 extensions; OpenCL availability depends on the driver's support in the sandbox.
+
+## Automated builds and releases
+
+Push a version tag such as `v0.1.0` to build both x86_64 packages:
+
+- `entropy-x86_64.flatpak` for Linux.
+- `entropy-windows-x86_64.zip` for Windows, including Python, dependencies, the
+  OpenCL/Vulkan runtime, the enhancement model and an `Entropy.cmd` launcher.
+
+Both builds must succeed before the workflow publishes a GitHub Release with
+the two downloads and generated release notes. Run **Publish builds** manually
+from the Actions tab to download build artifacts without creating a release.
+Ordinary pushes and pull requests do not run a workflow.
+
+The Windows job builds MNN with MSVC, then checks the relocated portable package
+by importing MNN, loading the QML interface and resizing an image in the worker
+process. This does not validate GPU inference; hosted runners lack the required
+GPU hardware. To package locally after building the Windows runtime, run
+`uv run python scripts/package_windows.py`.
+
+Install a downloaded Flatpak with:
+
+```bash
+flatpak install --user entropy-x86_64.flatpak
+```
 
 ## Development
 

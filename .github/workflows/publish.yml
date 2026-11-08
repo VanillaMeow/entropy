@@ -1,4 +1,4 @@
-name: Publish Flatpak
+name: Publish builds
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   flatpak:
@@ -28,11 +28,57 @@ jobs:
           arch: x86_64
           build-dir: flatpak-build
           repo-dir: flatpak-repo
+          artifact-name: flatpak-x86_64
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Set up MSVC and Windows SDK
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - run: uv sync --locked
+
+      - name: Build OpenCL and Vulkan runtime
+        run: uv run python scripts/build_mnn.py --jobs 2
+
+      - name: Package and smoke-test portable Windows build
+        run: uv run python scripts/package_windows.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/entropy-windows-x86_64.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    needs: [flatpak, windows]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: entropy-x86_64.flatpak
+          files: |
+            release/entropy-x86_64.flatpak
+            release/entropy-windows-x86_64.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
