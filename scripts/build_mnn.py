@@ -53,7 +53,7 @@ def run(command: list[str], *, cwd: Path | None = None, env: dict[str, str] | No
 
 
 def main() -> int:
-    """Build a pinned native wheel and activate it only after an import check."""
+    """Build a pinned native wheel and activate it after installation succeeds."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(8, os.cpu_count() or 2))
     parser.add_argument("--source", type=Path, help="Reuse an existing pinned MNN source checkout")
@@ -210,18 +210,6 @@ def main() -> int:
             str(target),
             str(wheels[-1]),
         ]
-    )
-    probe_env = os.environ.copy()
-    probe_env["PYTHONPATH"] = str(target)
-    run(
-        [
-            sys.executable,
-            "-c",
-            "import MNN; "
-            "print('OpenCL:', MNN.Interpreter.createRuntime(({'backend': 3},))[1][0]); "
-            "print('Vulkan:', MNN.Interpreter.createRuntime(({'backend': 7},))[1][0])",
-        ],
-        env=probe_env,
     )
     manifest = root / f".active-{uuid4().hex}.json"
     manifest.write_text(

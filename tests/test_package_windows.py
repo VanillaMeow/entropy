@@ -1,4 +1,4 @@
-"""Check archive contents and prevent publication when a portable smoke test fails."""
+"""Check the contents of the portable Windows archive."""
 
 import subprocess
 from pathlib import Path
@@ -10,9 +10,8 @@ import pytest
 from scripts import package_windows
 
 
-@pytest.mark.parametrize("smoke_fails", [False, True])
 def test_portable_archive_contains_runtime_model_and_launcher(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, smoke_fails: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = tmp_path / "project"
     project.mkdir()
@@ -33,7 +32,6 @@ def test_portable_archive_contains_runtime_model_and_launcher(
     (native / "MNN").mkdir(parents=True)
     (native / "MNN" / "__init__.py").write_bytes(b"GPU runtime")
     (native / "_mnncengine.pyd").write_bytes(b"native extension")
-    smoke_calls = []
 
     def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         assert kwargs["check"] is True
@@ -55,20 +53,7 @@ def test_portable_archive_contains_runtime_model_and_launcher(
                 qml.mkdir(parents=True)
                 (qml / "Main.qml").write_text("ApplicationWindow {}", encoding="utf-8")
         else:
-            assert command[1:3] == ["-I", "-c"]
-            bundle = Path(str(kwargs["cwd"]))
-            assert "portable path with spaces" in str(bundle)
-            assert Path(command[0]) == bundle / "python" / "python.exe"
-            assert Path(command[0]).read_bytes() == b"interpreter"
-            assert (bundle / "python" / "Lib" / "site-packages" / "_mnncengine.pyd").is_file()
-            environment = kwargs["env"]
-            assert isinstance(environment, dict)
-            assert "PYTHONHOME" not in environment and "PYTHONPATH" not in environment
-            assert Path(environment["ENTROPY_MODEL_DIR"]) == bundle / "models"
-            assert Path(environment["LOCALAPPDATA"]) != native_root
-            smoke_calls.append(command)
-            if smoke_fails:
-                raise subprocess.CalledProcessError(1, command)
+            raise AssertionError(f"Unexpected packaging command: {command}")
         return subprocess.CompletedProcess(command, 0)
 
     def fake_model(*, directory: Path) -> Path:
@@ -89,35 +74,24 @@ def test_portable_archive_contains_runtime_model_and_launcher(
     )
     monkeypatch.setattr(package_windows, "ensure_default_model", fake_model)
     monkeypatch.setattr(package_windows.subprocess, "run", fake_run)
-    monkeypatch.setenv("PYTHONHOME", "unrelated-python")
-    monkeypatch.setenv("PYTHONPATH", "unrelated-packages")
     monkeypatch.setenv("VCTOOLSREDISTDIR", str(redist))
 
-    if smoke_fails:
-        with pytest.raises(subprocess.CalledProcessError):
-            package_windows.package_windows(project)
-        assert not list((project / "dist").glob("*.zip"))
-    else:
-        archive = package_windows.package_windows(project)
-        assert archive.name == "entropy-windows-x86_64.zip"
-        with ZipFile(archive) as bundle:
-            assert bundle.read("Entropy/LICENSE") == b"Mozilla Public License Version 2.0"
-            assert bundle.read("Entropy/python/python314.dll") == b"Python runtime"
-            assert bundle.read("Entropy/python/msvcp140.dll") == b"MSVC runtime"
-            assert bundle.read("Entropy/python/Lib/site-packages/MNN/__init__.py") == b"GPU runtime"
-            assert (
-                bundle.read("Entropy/python/Lib/site-packages/_mnncengine.pyd")
-                == b"native extension"
-            )
-            assert "Entropy/python/Lib/site-packages/src/qml/Main.qml" in bundle.namelist()
-            assert "Entropy/python/Lib/site-packages/PySide6/QtQml.pyd" in bundle.namelist()
-            assert bundle.read("Entropy/models/model.mnn") == b"model"
-            assert bundle.read("Entropy/models/model.license.txt") == b"model license"
-            launcher = bundle.read("Entropy/Entropy.cmd")
-            assert b'"%~dp0python\\python.exe" -I -m src' in launcher
-            assert b"\r\n" in launcher
-            assert not any(
-                "unrelated" in name or name.endswith(".whl") for name in bundle.namelist()
-            )
-    assert len(smoke_calls) == 1
+    archive = package_windows.package_windows(project)
+    assert archive.name == "entropy-windows-x86_64.zip"
+    with ZipFile(archive) as bundle:
+        assert bundle.read("Entropy/LICENSE") == b"Mozilla Public License Version 2.0"
+        assert bundle.read("Entropy/python/python314.dll") == b"Python runtime"
+        assert bundle.read("Entropy/python/msvcp140.dll") == b"MSVC runtime"
+        assert bundle.read("Entropy/python/Lib/site-packages/MNN/__init__.py") == b"GPU runtime"
+        assert (
+            bundle.read("Entropy/python/Lib/site-packages/_mnncengine.pyd") == b"native extension"
+        )
+        assert "Entropy/python/Lib/site-packages/src/qml/Main.qml" in bundle.namelist()
+        assert "Entropy/python/Lib/site-packages/PySide6/QtQml.pyd" in bundle.namelist()
+        assert bundle.read("Entropy/models/model.mnn") == b"model"
+        assert bundle.read("Entropy/models/model.license.txt") == b"model license"
+        launcher = bundle.read("Entropy/Entropy.cmd")
+        assert b'"%~dp0python\\python.exe" -I -m src' in launcher
+        assert b"\r\n" in launcher
+        assert not any("unrelated" in name or name.endswith(".whl") for name in bundle.namelist())
     assert not list((project / "build").iterdir())

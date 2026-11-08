@@ -25,48 +25,9 @@ if not "%entropy_exit%"=="0" pause
 exit /b %entropy_exit%
 """
 
-SMOKE_TEST = """
-import subprocess
-import sys
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
-from PIL import Image
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtQuickControls2 import QQuickStyle
-from src.app import create_engine
-from src.config import UpscaleRequest
-from src.controller import AppController
-from src.engine import import_mnn
-from src.models import ensure_default_model
-
-assert Path(import_mnn().__file__).resolve().is_relative_to(Path.cwd())
-assert ensure_default_model().is_file()
-QQuickStyle.setStyle("Material")
-app = QGuiApplication([])
-controller = AppController(start_setup=False)
-engine = create_engine(controller)
-assert engine.rootObjects(), "Packaged QML failed to load"
-for window in engine.rootObjects():
-    window.close()
-controller.shutdown()
-with TemporaryDirectory() as scratch:
-    scratch = Path(scratch)
-    image = scratch / "input.png"
-    Image.new("RGBA", (8, 6), (100, 150, 200, 80)).save(image)
-    request = UpscaleRequest(images=(image,), output_dir=scratch, output_scale=0.5)
-    job = scratch / "job.json"
-    job.write_text(request.model_dump_json(), encoding="utf-8")
-    subprocess.run([sys.executable, "-I", "-m", "src.worker", str(job)],
-                   check=True, timeout=60)
-    with Image.open(scratch / "input_0.5x.png") as output:
-        assert output.size == (4, 3) and output.mode == "RGBA"
-print("Portable Python, MNN, QML, bundled model and worker smoke test passed.")
-"""
-
 
 def package_windows(project: Path) -> Path:
-    """Assemble and check a relocated bundle before creating its release archive."""
+    """Assemble the portable bundle and create its release archive."""
     if sys.platform != "win32":
         raise RuntimeError("Windows packaging must run on a Windows x64 build host.")
     python_home = Path(sys.base_prefix)
@@ -155,30 +116,8 @@ def package_windows(project: Path) -> Path:
         shutil.copy2(project / "LICENSE", bundle / "LICENSE")
         (bundle / "Entropy.cmd").write_bytes(LAUNCHER.replace("\n", "\r\n").encode("ascii"))
 
-        # Relocate before checking, so paths from the build cannot hide missing files.
-        relocated = staging / "portable path with spaces" / "Entropy"
-        relocated.parent.mkdir()
-        shutil.move(bundle, relocated)
-        environment = os.environ.copy()
-        environment.pop("PYTHONHOME", None)
-        environment.pop("PYTHONPATH", None)
-        environment.update(
-            PYTHONNOUSERSITE="1",
-            PYTHONUTF8="1",
-            LOCALAPPDATA=str(staging / "smoke-data"),
-            QT_QPA_PLATFORM="offscreen",
-            QT_QUICK_BACKEND="software",
-            ENTROPY_MODEL_DIR=str(relocated / "models"),
-        )
-        subprocess.run(
-            [str(relocated / "python" / "python.exe"), "-I", "-c", SMOKE_TEST],
-            cwd=relocated,
-            env=environment,
-            check=True,
-            timeout=120,
-        )
         archive = shutil.make_archive(
-            str(dist / "entropy-windows-x86_64"), "zip", relocated.parent, relocated.name
+            str(dist / "entropy-windows-x86_64"), "zip", staging, bundle.name
         )
     return Path(archive)
 

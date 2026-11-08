@@ -198,10 +198,10 @@ Ordinary pushes and pull requests do not run a workflow.
 Tags with a prerelease suffix, such as `v0.1.0-alpha.1`, publish as GitHub
 prereleases; tags such as `v0.1.0` publish as stable releases.
 
-The Windows job builds MNN with MSVC, then checks the relocated portable package
-by importing MNN, loading the QML interface and resizing an image in the worker
-process. This does not validate GPU inference; hosted runners lack the required
-GPU hardware. To package locally after building the Windows runtime, run
+The workflow only builds, packages and publishes. It does not install development
+dependencies or run tests, smoke tests, GPU probes or lint checks. The Windows
+job builds MNN with MSVC and creates the portable ZIP. To package locally after
+building the Windows runtime, run
 `uv run python scripts/package_windows.py`.
 
 Install a downloaded Flatpak with:
@@ -229,7 +229,7 @@ cannot load.
 
 After changing Python properties exposed to QML, regenerate the checked-in
 tooling metadata and lint the components with `uv run python scripts/check_qml.py`.
-Add `--format` to apply `qmlformat`. Run these checks locally before publishing;
+Add `--format` to apply `qmlformat`. These optional checks run locally;
 headless UI tests load light/dark themes, the compact layout and drawers.
 
 To verify actual portal D-Bus requests in a Linux desktop session:

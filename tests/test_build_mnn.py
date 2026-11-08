@@ -12,9 +12,9 @@ from scripts import build_mnn
 
 
 @pytest.mark.parametrize("platform_name", ["linux", "win32"])
-@pytest.mark.parametrize("probe_fails", [False, True])
-def test_build_activates_runtime_only_after_successful_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, platform_name: str, probe_fails: bool
+@pytest.mark.parametrize("install_fails", [False, True])
+def test_build_activates_runtime_only_after_successful_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, platform_name: str, install_fails: bool
 ) -> None:
     source = tmp_path / "MNN source with spaces"
     package = source / "pymnn" / "pip_package"
@@ -45,15 +45,12 @@ def test_build_activates_runtime_only_after_successful_probe(
             wheel_dir.mkdir()
             (wheel_dir / "mnn_vulkan_opencl-test.whl").touch()
         elif command[:3] == ["uv", "pip", "install"] and "--target" in command:
+            if install_fails:
+                raise subprocess.CalledProcessError(1, command)
             assert Path(command[-1]).is_file()
             target = Path(command[command.index("--target") + 1])
             (target / "MNN").mkdir(parents=True)
             (target / "MNN" / "__init__.py").touch()
-        elif command[:2] == [sys.executable, "-c"]:
-            assert env is not None
-            assert (Path(env["PYTHONPATH"]) / "MNN" / "__init__.py").is_file()
-            if probe_fails:
-                raise subprocess.CalledProcessError(1, command)
 
     monkeypatch.setattr(sys, "argv", ["build_mnn.py", "--source", str(source), "--jobs", "2"])
     monkeypatch.setattr(
@@ -78,7 +75,7 @@ def test_build_activates_runtime_only_after_successful_probe(
     )
     monkeypatch.setattr(build_mnn, "run", fake_run)
 
-    if probe_fails:
+    if install_fails:
         with pytest.raises(subprocess.CalledProcessError):
             build_mnn.main()
         assert json.loads((root / "active.json").read_text()) == previous
