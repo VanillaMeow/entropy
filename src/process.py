@@ -6,6 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
+from .paths import is_compiled
 from .worker import EVENT_PREFIX
 
 
@@ -46,7 +47,12 @@ class WorkerProcess(QObject):
         process.readyReadStandardError.connect(self._read_stderr)
         process.finished.connect(self._on_finished)
         process.errorOccurred.connect(self._on_error)
-        process.start(sys.executable, ["-u", "-m", f"{__package__}.worker", argument])
+        arguments = (
+            ["--worker", argument]
+            if is_compiled()
+            else ["-u", "-m", f"{__package__}.worker", argument]
+        )
+        process.start(sys.executable, arguments)
         if argument == "--probe":
             self._probe_timeout.start(30000)
 

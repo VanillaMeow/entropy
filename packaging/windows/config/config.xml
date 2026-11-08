@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>Entropy</Name>
+    <Version>@VERSION@</Version>
+    <Title>Entropy Setup</Title>
+    <Publisher>jedace07</Publisher>
+    <ProductUrl>https://github.com/jedace07/entropy</ProductUrl>
+    <InstallerApplicationIcon>Entropy</InstallerApplicationIcon>
+    <InstallerWindowIcon>Entropy.ico</InstallerWindowIcon>
+    <StartMenuDir>Entropy</StartMenuDir>
+    <TargetDir>@HomeDir@/Entropy</TargetDir>
+    <MaintenanceToolName>EntropyMaintenanceTool</MaintenanceToolName>
+    <RemoveTargetDir>true</RemoveTargetDir>
+    <WizardStyle>Modern</WizardStyle>
+    <ControlScript>controlscript.qs</ControlScript>
+    <RunProgram>@TargetDir@/Entropy.exe</RunProgram>
+    <RunProgramDescription>Launch Entropy</RunProgramDescription>
+</Installer>

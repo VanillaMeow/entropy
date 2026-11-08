@@ -6,11 +6,13 @@ from importlib import invalidate_caches
 from pathlib import Path
 from typing import Any
 
-from .paths import runtime_root
+from .paths import is_compiled, runtime_root
 
 
 def activate_local_runtime() -> dict[str, Any] | None:
     """Prefer a GPU runtime installed by the build helper for this Python ABI."""
+    if is_compiled():
+        return None
     root = runtime_root()
     manifest = root / "active.json"
     if not manifest.is_file():

@@ -18,6 +18,18 @@ def test_no_local_runtime_leaves_import_path_unchanged(
     assert sys.path == before
 
 
+def test_compiled_app_uses_its_bundled_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runtime, "is_compiled", lambda: True)
+    monkeypatch.setattr(
+        runtime,
+        "runtime_root",
+        lambda: pytest.fail("Installed apps must not load user-built runtimes"),
+    )
+    before = sys.path.copy()
+    assert runtime.activate_local_runtime() is None
+    assert sys.path == before
+
+
 @pytest.mark.parametrize("directory", ["..", ".", "", "../outside", "/tmp/outside"])
 def test_manifest_cannot_escape_runtime_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, directory: str

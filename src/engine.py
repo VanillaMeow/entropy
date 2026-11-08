@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .config import Backend, ModelProfile
+from .paths import is_compiled
 from .runtime import activate_local_runtime
 
 FloatImage = NDArray[np.float32]
@@ -30,6 +31,11 @@ def import_mnn() -> Any:
         activate_local_runtime()
         return import_module("MNN")
     except ImportError as exc:
+        if is_compiled():
+            raise InferenceError(
+                "The bundled GPU runtime could not be loaded. Reinstall Entropy and "
+                f"check the GPU driver. Native loader error: {exc}"
+            ) from exc
         raise InferenceError(
             "MNN could not be loaded. Run 'uv run python scripts/build_mnn.py' "
             "to install the GPU runtime. "
@@ -59,6 +65,11 @@ class MnnRunner:
     def __init__(self, model_path: str, profile: ModelProfile, backend: Backend) -> None:
         self._mnn = import_mnn()
         if not _backend_available(self._mnn, backend):
+            if is_compiled():
+                raise InferenceError(
+                    f"{backend.value} could not initialize. Check that a compatible GPU "
+                    "driver is installed, then retry setup."
+                )
             raise InferenceError(
                 f"{backend.value} could not initialize. The standard MNN wheel omits GPU backends. "
                 "Run 'uv run python scripts/build_mnn.py' to build a GPU runtime. "

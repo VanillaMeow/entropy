@@ -22,6 +22,7 @@ mnn = ["MNN>=3.6.2,<4"]
 
 [dependency-groups]
 dev = ["pytest>=9.2.0,<10", "ruff>=0.17.4"]
+windows-build = ["Nuitka==4.1.1", "aqtinstall==3.3.0"]
 
 [project.scripts]
 entropy = "src:main"

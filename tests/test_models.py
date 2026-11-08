@@ -3,6 +3,7 @@
 import hashlib
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.error import URLError
 
 import pytest
@@ -94,6 +95,27 @@ def test_bundled_model_works_without_network_or_writable_storage(
 
     monkeypatch.setattr(models, "urlopen", unexpected_access)
     monkeypatch.setattr(models, "data_dir", unexpected_access)
+    assert models.ensure_default_model() == bundled
+
+
+def test_compiled_app_discovers_the_installed_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, artifact: bytes
+) -> None:
+    directory = tmp_path / "models"
+    directory.mkdir()
+    bundled = directory / f"test-model-{models.DEFAULT_MODEL.sha256[:12]}.mnn"
+    bundled.write_bytes(artifact)
+    monkeypatch.delenv("ENTROPY_MODEL_DIR", raising=False)
+    monkeypatch.setattr(models, "is_compiled", lambda: True)
+    monkeypatch.setattr(models, "sys", SimpleNamespace(executable=str(tmp_path / "Entropy.exe")))
+    monkeypatch.setattr(
+        models,
+        "urlopen",
+        lambda *args, **kwargs: pytest.fail("The installed model must work offline"),
+    )
+    monkeypatch.setattr(
+        models, "data_dir", lambda: pytest.fail("The installation may be read-only")
+    )
     assert models.ensure_default_model() == bundled
 
 

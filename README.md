@@ -14,9 +14,13 @@ is deferred until MNN publishes a compatible wheel. Use
 tested platform. The runtime build helper also supports Windows x64 with MSVC;
 native Windows GPU validation is still pending.
 
-For the portable Windows release, download `entropy-windows-x86_64.zip`, extract
-the entire archive, and open `Entropy/Entropy.cmd`. It includes Python, the GPU
-runtime and the enhancement model; only a compatible GPU driver is required.
+For Windows, download and run `entropy-windows-x86_64-setup.exe`. The installer
+installs Entropy for the current user under `%LOCALAPPDATA%\Programs\Entropy`,
+creates Start menu and desktop shortcuts, and registers an uninstaller in Windows
+Settings. Launch **Entropy** from the Start menu. The app includes its dependencies,
+the OpenCL/Vulkan runtime and the enhancement model; Python is not required.
+Only a compatible GPU driver is needed. The installer displays the full
+**Mozilla Public License 2.0** and installs its text alongside the application.
 
 ```bash
 uv sync
@@ -188,8 +192,9 @@ extensions; OpenCL availability depends on the driver's support in the sandbox.
 Push a version tag such as `v0.1.0` to build both x86_64 packages:
 
 - `entropy-x86_64.flatpak` for Linux.
-- `entropy-windows-x86_64.zip` for Windows, including Python, dependencies, the
-  OpenCL/Vulkan runtime, the enhancement model and an `Entropy.cmd` launcher.
+- `entropy-windows-x86_64-setup.exe` for Windows, an offline Qt Installer Framework
+  installer containing the standalone application, dependencies, the OpenCL/Vulkan
+  runtime, the enhancement model and license texts.
 
 Both builds must succeed before the workflow publishes a GitHub Release with
 the two downloads and generated release notes. Run **Publish builds** manually
@@ -198,11 +203,33 @@ Ordinary pushes and pull requests do not run a workflow.
 Tags with a prerelease suffix, such as `v0.1.0-alpha.1`, publish as GitHub
 prereleases; tags such as `v0.1.0` publish as stable releases.
 
-The workflow only builds, packages and publishes. It does not install development
-dependencies or run tests, smoke tests, GPU probes or lint checks. The Windows
-job builds MNN with MSVC and creates the portable ZIP. To package locally after
-building the Windows runtime, run
-`uv run python scripts/package_windows.py`.
+The workflow only builds, packages and publishes. It does not install the `dev`
+dependency group or run tests, smoke tests, GPU probes or lint checks. The Windows
+job builds MNN with MSVC, compiles the application with `pyside6-deploy` (Nuitka in
+standalone mode), then wraps it with Qt Installer Framework's `binarycreator`.
+The application starts without a console window and uses its own executable for
+isolated GPU workers. It reads the bundled model from its installation directory
+and keeps user preferences and cached data in the existing per-user locations.
+The installer includes Start menu, desktop and uninstall shortcuts, with a
+maintenance tool also available through Windows Settings.
+
+To build the installer locally on Windows, use the x64 Native Tools Command Prompt
+and install the build tools and Qt Installer Framework:
+
+```bat
+uv sync --group windows-build
+uv run --group windows-build aqt install-tool windows desktop tools_ifw qt.tools.ifw.47 --outputdir C:\Qt
+uv run --group windows-build python scripts/build_mnn.py --jobs 4
+uv run --group windows-build python scripts/package_windows.py --binarycreator C:\Qt\Tools\QtInstallerFramework\4.7\bin\binarycreator.exe
+```
+
+You can instead put `binarycreator.exe` on `PATH` or set `QTIFW_BINARYCREATOR` to
+its full path. The resulting installer is `dist/entropy-windows-x86_64-setup.exe`.
+Packaging derives the installer and executable versions from the same Python
+package metadata used by the app's version label. The app's MPL 2.0 license is
+shown on the license page and installed as `LICENSE`; the model and dependencies
+retain their separate license and notice files. Uninstalling removes installed
+application files and shortcuts while preserving per-user preferences and data.
 
 Install a downloaded Flatpak with:
 

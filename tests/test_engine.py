@@ -12,13 +12,18 @@ from src.config import Backend, ModelProfile
 from src.engine import InferenceError, MnnRunner
 
 
-def test_unavailable_gpu_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("compiled", [False, True])
+def test_unavailable_gpu_is_rejected(monkeypatch: pytest.MonkeyPatch, compiled: bool) -> None:
     fake = SimpleNamespace(
         Interpreter=SimpleNamespace(createRuntime=lambda _: (object(), (False,)))
     )
     monkeypatch.setattr(engine, "import_mnn", lambda: fake)
-    with pytest.raises(InferenceError, match="Vulkan could not initialize"):
+    monkeypatch.setattr(engine, "is_compiled", lambda: compiled)
+    with pytest.raises(InferenceError, match="Vulkan could not initialize") as error:
         MnnRunner("unused.mnn", ModelProfile(), Backend.VULKAN)
+    if compiled:
+        assert "driver" in str(error.value)
+        assert "uv run" not in str(error.value)
 
 
 @pytest.fixture

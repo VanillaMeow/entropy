@@ -1,6 +1,7 @@
 """Qt Quick loading, view-model actions, and subprocess lifecycle checks."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -252,3 +253,23 @@ def test_subprocess_cancellation_reaps_child(qt_app: QGuiApplication) -> None:
     process.shutdown()
     assert finished and finished[0][1] is True
     assert not process.running
+
+
+def test_compiled_worker_launches_the_application_executable(
+    qt_app: QGuiApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtCore import QProcess
+
+    from src import process as process_module
+
+    launches = []
+    monkeypatch.setattr(process_module, "is_compiled", lambda: True)
+    monkeypatch.setattr(
+        QProcess,
+        "start",
+        lambda self, executable, arguments: launches.append((executable, arguments)),
+    )
+    process = WorkerProcess()
+    process.start("--prepare")
+    assert launches == [(sys.executable, ["--worker", "--prepare"])]
+    process.shutdown()

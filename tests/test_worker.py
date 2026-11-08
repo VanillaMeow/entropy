@@ -11,6 +11,25 @@ from src.config import ModelProfile, UpscaleRequest
 from src.engine import FloatImage
 
 
+def test_application_entry_point_dispatches_worker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+
+    import src
+    from src import app
+
+    calls = []
+
+    def run_worker() -> int:
+        calls.append(sys.argv[1:])
+        return 7
+
+    monkeypatch.setattr(sys, "argv", ["Entropy.exe", "--worker", "--probe"])
+    monkeypatch.setattr(worker, "main", run_worker)
+    monkeypatch.setattr(app, "run", lambda: pytest.fail("Worker mode must not launch the GUI"))
+    assert src.main() == 7
+    assert calls == [["--probe"]]
+
+
 def test_batch_continues_after_corrupt_image(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

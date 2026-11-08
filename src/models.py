@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.resources import files
@@ -11,7 +12,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from .config import ModelProfile
-from .paths import data_dir
+from .paths import data_dir, is_compiled
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,8 @@ def ensure_default_model(
     """
     artifact = DEFAULT_MODEL
     bundled_directory = os.environ.get("ENTROPY_MODEL_DIR") if directory is None else None
+    if directory is None and not bundled_directory and is_compiled():
+        bundled_directory = str(Path(sys.executable).parent / "models")
     if bundled_directory:
         bundled = Path(bundled_directory) / f"{artifact.name}-{artifact.sha256[:12]}.mnn"
         try:

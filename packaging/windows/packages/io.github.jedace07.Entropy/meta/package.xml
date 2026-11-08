@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+    <DisplayName>Entropy</DisplayName>
+    <Description>Qt Quick image upscaler with OpenCL and Vulkan acceleration.</Description>
+    <Version>@VERSION@</Version>
+    <ReleaseDate>@RELEASE_DATE@</ReleaseDate>
+    <Licenses>
+        <License name="Mozilla Public License 2.0" file="LICENSE"/>
+        <License name="Real-ESRGAN (BSD 3-Clause)" file="Real-ESRGAN.txt"/>
+    </Licenses>
+    <Default>true</Default>
+    <ForcedInstallation>true</ForcedInstallation>
+    <Script>installscript.qs</Script>
+    <StopProcessForUpdate>Entropy.exe</StopProcessForUpdate>
+</Package>
