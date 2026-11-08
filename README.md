@@ -148,6 +148,20 @@ single-file bundle after building:
 flatpak build-bundle flatpak-repo entropy.flatpak io.github.jedace07.Entropy
 ```
 
+### Automated builds and releases
+
+Push a version tag such as `v0.1.0` to build the x86_64 Flatpak and publish it
+as `entropy-x86_64.flatpak` on a GitHub Release with generated release notes.
+You can also run **Publish Flatpak** manually from the Actions tab to download
+a build artifact without creating a release. Ordinary pushes and pull requests
+do not run a workflow.
+
+Install a downloaded bundle with:
+
+```bash
+flatpak install --user entropy-x86_64.flatpak
+```
+
 Filesystem access is read/write for the home directory, `/mnt`, `/media`, and
 `/run/media`. Other permissions are limited to GPU rendering and compute,
 Wayland, fallback X11, and shared IPC for X11. File pickers and opening output
@@ -176,8 +190,8 @@ cannot load.
 
 After changing Python properties exposed to QML, regenerate the checked-in
 tooling metadata and lint the components with `uv run python scripts/check_qml.py`.
-Add `--format` to apply `qmlformat`. CI checks both Python and QML; headless UI tests
-load light/dark themes, the compact layout and drawers.
+Add `--format` to apply `qmlformat`. Run these checks locally before publishing;
+headless UI tests load light/dark themes, the compact layout and drawers.
 
 To verify actual portal D-Bus requests in a Linux desktop session:
 
@@ -196,8 +210,8 @@ UPSCALER_TEST_GPU=1 uv run pytest tests/test_gpu.py -v
 
 These tests require the GPU runtime and drivers, and install the pinned model if
 it is not cached. They check dynamic tile inference, output dimensions and pixel
-sanity. CI covers Python 3.14; GPU tests are opt-in because hosted runners
-lack the required GPU hardware. Weekly dependency updates are configured.
+sanity. GPU tests are opt-in and require suitable GPU hardware. Weekly dependency
+updates are configured.
 
 Local validation on Aurora 44 with an RTX 3080 and Intel UHD 750: both real-model
 GPU tests passed, as did the full Qt Quick setup → automatic model → Vulkan inference

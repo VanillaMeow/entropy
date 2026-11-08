@@ -1,0 +1,38 @@
+name: Publish Flatpak
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.jedace07.Entropy.yaml
+          bundle: entropy-x86_64.flatpak
+          arch: x86_64
+          build-dir: flatpak-build
+          repo-dir: flatpak-repo
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: entropy-x86_64.flatpak
+          fail_on_unmatched_files: true
+          generate_release_notes: true
