@@ -17,6 +17,7 @@ def test_portable_archive_contains_runtime_model_and_launcher(
     project = tmp_path / "project"
     project.mkdir()
     (project / "README.md").write_text("Read me", encoding="utf-8")
+    (project / "LICENSE").write_text("Mozilla Public License Version 2.0", encoding="utf-8")
     python_home = tmp_path / "managed-python"
     unrelated = python_home / "Lib" / "site-packages" / "unrelated"
     unrelated.mkdir(parents=True)
@@ -100,6 +101,7 @@ def test_portable_archive_contains_runtime_model_and_launcher(
         archive = package_windows.package_windows(project)
         assert archive.name == "entropy-windows-x86_64.zip"
         with ZipFile(archive) as bundle:
+            assert bundle.read("Entropy/LICENSE") == b"Mozilla Public License Version 2.0"
             assert bundle.read("Entropy/python/python314.dll") == b"Python runtime"
             assert bundle.read("Entropy/python/msvcp140.dll") == b"MSVC runtime"
             assert bundle.read("Entropy/python/Lib/site-packages/MNN/__init__.py") == b"GPU runtime"

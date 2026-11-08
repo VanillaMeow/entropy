@@ -82,3 +82,4 @@ jobs:
             release/entropy-windows-x86_64.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

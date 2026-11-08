@@ -152,6 +152,7 @@ def package_windows(project: Path) -> Path:
         shutil.copytree(native, packages, dirs_exist_ok=True)
         ensure_default_model(directory=bundle / "models")
         shutil.copy2(project / "README.md", bundle / "README.md")
+        shutil.copy2(project / "LICENSE", bundle / "LICENSE")
         (bundle / "Entropy.cmd").write_bytes(LAUNCHER.replace("\n", "\r\n").encode("ascii"))
 
         # Relocate before checking, so paths from the build cannot hide missing files.

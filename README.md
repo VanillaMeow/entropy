@@ -4,6 +4,8 @@ A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL and Vulkan. Th
 installs its default **Real-ESRGAN General 4×** enhancement model automatically.
 There is no model file picker or manual model configuration.
 
+The current prerelease is **v0.1.0-alpha.1** (`0.1.0a1` in Python package metadata).
+
 ## Run
 
 Python 3.14 is required and selected by `.python-version`. Python 3.15 support
@@ -193,6 +195,8 @@ Both builds must succeed before the workflow publishes a GitHub Release with
 the two downloads and generated release notes. Run **Publish builds** manually
 from the Actions tab to download build artifacts without creating a release.
 Ordinary pushes and pull requests do not run a workflow.
+Tags with a prerelease suffix, such as `v0.1.0-alpha.1`, publish as GitHub
+prereleases; tags such as `v0.1.0` publish as stable releases.
 
 The Windows job builds MNN with MSVC, then checks the relocated portable package
 by importing MNN, loading the QML interface and resizing an image in the worker
@@ -252,3 +256,15 @@ Local validation on Aurora 44 with an RTX 3080 and Intel UHD 750: both real-mode
 GPU tests passed, as did the full Qt Quick setup → automatic model → Vulkan inference
 → RGBA PNG export workflow. Availability is reported by MNN; inference checks
 also validate output pixels so a successful probe alone is not treated as proof.
+
+## License
+
+Entropy's source code is licensed under the [Mozilla Public License 2.0](LICENSE).
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, you can obtain
+one at https://mozilla.org/MPL/2.0/.
+
+Source code is available at https://github.com/jedace07/entropy; each release's
+tag identifies its corresponding source. Bundled third-party dependencies and
+the enhancement model retain their own licenses. The model's
+[Real-ESRGAN license](src/licenses/Real-ESRGAN.txt) is included separately.
