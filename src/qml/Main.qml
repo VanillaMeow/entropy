@@ -15,7 +15,7 @@ ApplicationWindow {
     minimumWidth: 760
     minimumHeight: 680
     visible: true
-    title: qsTr("Entropy")
+    title: qsTr("Entropy v%1").arg(Qt.application.version)
     color: Theme.background
     font.pointSize: Theme.body
     Material.theme: controller.darkTheme ? Material.Dark : Material.Light
