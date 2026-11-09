@@ -412,7 +412,7 @@ class AppController(QObject):
         elif kind == "runtime_ready":
             self._terminal_event = True
             self._runtime_ready = event["available"]
-            self._log(f"OpenCL: {'ready' if self._runtime_ready else 'unavailable'}")
+            self._log(f"GPU runtime: {'ready' if self._runtime_ready else 'unavailable'}")
             if self._runtime_ready:
                 self._status = self.tr("Ready when you are")
             else:

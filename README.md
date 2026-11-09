@@ -1,10 +1,14 @@
 # Entropy
 
-A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL. The app
+A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL and Metal backends. The app
 installs its default **Real-ESRGAN General 4×** enhancement model automatically.
 There is no model file picker or manual model configuration.
 
-The current prerelease is **v0.1.0-alpha.1** (`0.1.0a1` in Python package metadata).
+The current prerelease is **v0.2.0-alpha.1** (`0.2.0a1` in Python package metadata).
+
+The runtime automatically selects Metal on macOS and OpenCL on Linux and Windows;
+backend selection is internal. Metal is groundwork for future macOS support:
+macOS runtime builds, packaging, and hardware validation are not yet provided.
 
 ## Run
 

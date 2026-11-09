@@ -8,14 +8,19 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src import worker
+from src import engine, worker
 from src.config import ModelProfile, UpscaleRequest
 from src.engine import FloatImage
 
 
 @pytest.mark.parametrize("available", [False, True])
-def test_probe_reports_opencl_readiness(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], available: bool
+@pytest.mark.parametrize("platform_name,backend_id", [("linux", 3), ("win32", 3), ("darwin", 1)])
+def test_probe_reports_platform_gpu_readiness(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    available: bool,
+    platform_name: str,
+    backend_id: int,
 ) -> None:
     configurations = []
 
@@ -28,9 +33,10 @@ def test_probe_reports_opencl_readiness(
         Interpreter=SimpleNamespace(createRuntime=create_runtime),
     )
     monkeypatch.setattr(sys, "argv", ["worker", "--probe"])
+    monkeypatch.setattr(engine, "sys", SimpleNamespace(platform=platform_name))
     monkeypatch.setattr(worker, "import_mnn", lambda: mnn)
     assert worker.main() == 0
-    assert configurations == [({"backend": 3},)]
+    assert configurations == [({"backend": backend_id},)]
     event = json.loads(capsys.readouterr().out.strip().removeprefix(worker.EVENT_PREFIX))
     assert event == {
         "event": "runtime_ready",

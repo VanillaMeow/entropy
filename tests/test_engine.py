@@ -13,17 +13,54 @@ from src.engine import InferenceError, MnnRunner
 
 
 @pytest.mark.parametrize("compiled", [False, True])
-def test_unavailable_gpu_is_rejected(monkeypatch: pytest.MonkeyPatch, compiled: bool) -> None:
+@pytest.mark.parametrize(
+    "platform_name,backend", [("linux", "OpenCL"), ("win32", "OpenCL"), ("darwin", "Metal")]
+)
+def test_unavailable_gpu_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, compiled: bool, platform_name: str, backend: str
+) -> None:
     fake = SimpleNamespace(
         Interpreter=SimpleNamespace(createRuntime=lambda _: (object(), (False,)))
     )
     monkeypatch.setattr(engine, "import_mnn", lambda: fake)
     monkeypatch.setattr(engine, "is_compiled", lambda: compiled)
-    with pytest.raises(InferenceError, match="OpenCL could not initialize") as error:
+    monkeypatch.setattr(engine, "sys", SimpleNamespace(platform=platform_name))
+    with pytest.raises(InferenceError, match=f"{backend} could not initialize") as error:
         MnnRunner("unused.mnn", ModelProfile())
     if compiled:
         assert "driver" in str(error.value)
         assert "uv run" not in str(error.value)
+    elif platform_name == "darwin":
+        assert "built with Metal support" in str(error.value)
+        assert "build_mnn.py" not in str(error.value)
+
+
+@pytest.mark.parametrize("platform_name,backend_id", [("linux", 3), ("win32", 3), ("darwin", 1)])
+def test_probe_and_inference_use_the_platform_gpu(
+    monkeypatch: pytest.MonkeyPatch, platform_name: str, backend_id: int
+) -> None:
+    probes, runtimes = [], []
+
+    def create_runtime(config: tuple[dict[str, int], ...]) -> tuple[object, tuple[bool]]:
+        probes.append(config)
+        return object(), (True,)
+
+    def create_runtime_manager(config: tuple[dict[str, object], ...]) -> None:
+        runtimes.append(config)
+        raise RuntimeError("Stop before loading a model")
+
+    fake = SimpleNamespace(Interpreter=SimpleNamespace(createRuntime=create_runtime))
+    modules = {
+        "MNN.expr": object(),
+        "MNN.nn": SimpleNamespace(create_runtime_manager=create_runtime_manager),
+    }
+    monkeypatch.setattr(engine, "sys", SimpleNamespace(platform=platform_name))
+    monkeypatch.setattr(engine, "import_mnn", lambda: fake)
+    monkeypatch.setattr(engine, "import_module", modules.__getitem__)
+    with pytest.raises(RuntimeError, match="Stop before loading a model"):
+        MnnRunner("unused.mnn", ModelProfile())
+    assert probes == [({"backend": backend_id},)]
+    assert runtimes == [({"backend": backend_id, "precision": "high", "numThread": 4},)]
 
 
 @pytest.fixture
@@ -36,7 +73,7 @@ def native_cpu(monkeypatch: pytest.MonkeyPatch) -> Any:
         pytest.skip(str(exc))
     import MNN.expr as expr
 
-    monkeypatch.setattr(engine, "OPENCL_BACKEND", 0)
+    monkeypatch.setattr(engine, "gpu_backend", lambda: ("CPU", 0))
     return expr
 
 

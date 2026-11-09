@@ -25,7 +25,7 @@ def test_request_round_trip(tmp_path: Path) -> None:
     assert request.staging_path.parent == tmp_path
 
 
-@pytest.mark.parametrize("backend", ["CPU", "Vulkan", "OpenCL"])
+@pytest.mark.parametrize("backend", ["CPU", "Vulkan", "OpenCL", "Metal"])
 def test_request_rejects_backend_selection(tmp_path: Path, backend: str) -> None:
     with pytest.raises(ValidationError):
         UpscaleRequest(images=(tmp_path / "a.png",), output_dir=tmp_path, backend=backend)

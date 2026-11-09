@@ -1,5 +1,6 @@
 """GPU model execution, kept independent of Qt and image file handling."""
 
+import sys
 from importlib import import_module
 from typing import Any, Protocol
 
@@ -11,7 +12,6 @@ from .paths import is_compiled
 from .runtime import activate_local_runtime
 
 FloatImage = NDArray[np.float32]
-OPENCL_BACKEND = 3
 
 
 class InferenceError(RuntimeError):
@@ -37,6 +37,11 @@ def import_mnn() -> Any:
                 "The bundled GPU runtime could not be loaded. Reinstall Entropy and "
                 f"check the GPU driver. Native loader error: {exc}"
             ) from exc
+        if sys.platform == "darwin":
+            raise InferenceError(
+                "MNN could not be loaded. Install a macOS MNN runtime with Metal support. "
+                f"Native loader error: {exc}"
+            ) from exc
         raise InferenceError(
             "MNN could not be loaded. Run 'uv run python scripts/build_mnn.py' "
             "to install the GPU runtime. "
@@ -44,13 +49,19 @@ def import_mnn() -> Any:
         ) from exc
 
 
-def opencl_available(mnn: Any) -> bool:
+def gpu_backend() -> tuple[str, int]:
+    """Select Metal on macOS and OpenCL elsewhere, without a user setting."""
+    return ("Metal", 1) if sys.platform == "darwin" else ("OpenCL", 3)
+
+
+def gpu_available(mnn: Any) -> bool:
     """Probe runtime creation, including driver availability.
 
     MNN.nn does not expose a capability query. The legacy Interpreter static
     method is used only for this check; inference uses the maintained nn API.
     """
-    runtime, supported = mnn.Interpreter.createRuntime(({"backend": OPENCL_BACKEND},))
+    _, backend_id = gpu_backend()
+    runtime, supported = mnn.Interpreter.createRuntime(({"backend": backend_id},))
     available = bool(supported[0])
     del runtime
     return available
@@ -60,12 +71,18 @@ class MnnRunner:
     """Run a dynamic RGB model with MNN's Module/RuntimeManager API."""
 
     def __init__(self, model_path: str, profile: ModelProfile) -> None:
+        backend_name, backend_id = gpu_backend()
         self._mnn = import_mnn()
-        if not opencl_available(self._mnn):
+        if not gpu_available(self._mnn):
             if is_compiled():
                 raise InferenceError(
-                    "OpenCL could not initialize. Check that a compatible GPU "
+                    f"{backend_name} could not initialize. Check that a compatible GPU "
                     "driver is installed, then retry setup."
+                )
+            if sys.platform == "darwin":
+                raise InferenceError(
+                    "Metal could not initialize. A Metal-capable Mac and an MNN runtime "
+                    "built with Metal support are required."
                 )
             raise InferenceError(
                 "OpenCL could not initialize. The standard MNN wheel omits OpenCL support. "
@@ -76,9 +93,9 @@ class MnnRunner:
         nn = import_module("MNN.nn")
         self._profile = profile
         self._runtime = nn.create_runtime_manager(
-            ({"backend": OPENCL_BACKEND, "precision": "high", "numThread": 4},)
+            ({"backend": backend_id, "precision": "high", "numThread": 4},)
         )
-        # Keep OpenCL as the primary backend; MNN may run unsupported ops on CPU.
+        # Keep the selected GPU backend primary; MNN may run unsupported ops on CPU.
         self._runtime.set_mode(8)
         self._module = nn.load_module_from_file(
             model_path,

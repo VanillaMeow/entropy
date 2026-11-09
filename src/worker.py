@@ -15,7 +15,7 @@ from typing import Any
 from PIL import Image
 
 from .config import UpscaleRequest
-from .engine import MnnRunner, import_mnn, opencl_available
+from .engine import MnnRunner, gpu_available, import_mnn
 from .imaging import load_image, save_output, upscale_image
 from .models import ensure_default_model
 
@@ -84,7 +84,7 @@ def _prepare_model() -> Path:
 
 
 def main() -> int:
-    """Probe OpenCL or execute a request from a local JSON file."""
+    """Probe the platform's GPU runtime or execute a request from a local JSON file."""
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
     warnings.simplefilter("error", Image.DecompressionBombWarning)
     try:
@@ -94,7 +94,7 @@ def main() -> int:
             mnn = import_mnn()
             emit(
                 "runtime_ready",
-                available=opencl_available(mnn),
+                available=gpu_available(mnn),
                 runtime_path=mnn.__file__,
             )
             return 0

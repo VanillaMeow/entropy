@@ -57,7 +57,7 @@ jobs:
           if (-not $binarycreator) { throw "Qt Installer Framework binarycreator.exe was not installed." }
           "QTIFW_BINARYCREATOR=$($binarycreator.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build OpenCL and Vulkan runtime
+      - name: Build OpenCL runtime
         run: uv run --locked --no-dev --group windows-build python scripts/build_mnn.py --jobs 2
 
       - name: Build Windows application and installer

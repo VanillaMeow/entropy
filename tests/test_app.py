@@ -218,7 +218,7 @@ def test_saved_backend_is_ignored_and_runtime_failure_blocks_upscaling(
     restored._handle_event({"event": "runtime_ready", "available": False})
     assert not restored.canStart
     assert restored.hasError
-    assert "OpenCL: unavailable" in restored.diagnostics
+    assert "GPU runtime: unavailable" in restored.diagnostics
     starts = []
     monkeypatch.setattr(restored._worker, "start", starts.append)
     restored.prepare()
