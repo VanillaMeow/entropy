@@ -1,6 +1,6 @@
 [project]
 name = "entropy"
-version = "0.2.0a1"
+version = "0.2.1a1"
 description = "Entropy: a Qt Quick image upscaler powered by MNN with OpenCL and Metal backends"
 readme = "README.md"
 license = "MPL-2.0"

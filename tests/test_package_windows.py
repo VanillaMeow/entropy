@@ -9,6 +9,8 @@ from xml.etree import ElementTree
 
 import pytest
 from PIL import Image
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QJSEngine
 
 from scripts import package_windows
 
@@ -94,6 +96,13 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
     def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         if command[0] == "pyside6-deploy":
             return fake_deploy(command, **kwargs)
+        if Path(command[0]).name == "Entropy.exe":
+            assert Path(command[0]).is_file()
+            assert kwargs["cwd"] == Path(command[0]).parent
+            assert kwargs["env"]["ENTROPY_STARTUP_CHECK"] == "1"
+            assert kwargs["env"]["QT_QPA_PLATFORM"] == "offscreen"
+            assert kwargs["timeout"] == 30
+            return subprocess.CompletedProcess(command, 0)
         assert command[0] == str(binarycreator)
         assert "--offline-only" in command
         assert kwargs["check"] is True
@@ -101,8 +110,7 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         settings = ElementTree.parse(config).getroot()
         assert settings.findtext("Version") == "0.1.0-alpha.1"
         assert settings.findtext("MaintenanceToolName") == "EntropyMaintenanceTool"
-        assert settings.findtext("RunProgram") == "@TargetDir@/Entropy.exe"
-        assert "LOCALAPPDATA" in config.with_name("controlscript.qs").read_text()
+        assert settings.findtext("RunProgram") == "@TargetDir@/app/Entropy.exe"
         with Image.open(config.with_name("Entropy.ico")) as icon:
             assert icon.format == "ICO"
             assert (16, 16) in icon.ico.sizes() and (256, 256) in icon.ico.sizes()
@@ -117,7 +125,7 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         assert licenses["Mozilla Public License 2.0"] == "LICENSE"
         assert (component / "meta" / "LICENSE").read_bytes() == license_text
         assert (component / "meta" / "Real-ESRGAN.txt").is_file()
-        data = component / "data"
+        data = component / "data" / "app"
         assert (data / "LICENSE").read_bytes() == license_text
         assert (data / "Entropy.exe").read_bytes() == b"standalone application"
         assert (data / "_mnncengine.pyd").read_bytes() == b"GPU runtime"
@@ -138,6 +146,10 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         assert "@DesktopDir@/Entropy.lnk" in shortcuts
         assert "@StartMenuDir@/Uninstall Entropy.lnk" in shortcuts
         assert "@TargetDir@/EntropyMaintenanceTool.exe" in shortcuts
+        assert "arguments=--start-uninstaller" in shortcuts
+        assert "@TargetDir@/app/Entropy.exe" in shortcuts
+        assert "workingDirectory=@TargetDir@/app" in shortcuts
+        assert not (component / "data" / "Entropy.exe").exists()
         assert not (data / "Entropy.cmd").exists()
         Path(command[-1]).write_bytes(b"offline installer")
         return subprocess.CompletedProcess(command, 0)
@@ -174,3 +186,53 @@ def test_missing_standalone_executable_is_rejected(
     )
     with pytest.raises(RuntimeError, match="did not produce the standalone"):
         package_windows.package_windows(project, binarycreator=binarycreator)
+
+
+def test_failed_startup_does_not_publish_an_installer(
+    build_host: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, binarycreator = build_host
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if command[0] == "pyside6-deploy":
+            return fake_deploy(command, **kwargs)
+        assert Path(command[0]).name == "Entropy.exe"
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(package_windows.subprocess, "run", fake_run)
+    with pytest.raises(subprocess.CalledProcessError):
+        package_windows.package_windows(project, binarycreator=binarycreator)
+    assert not list((project / "dist").iterdir())
+
+
+@pytest.mark.parametrize("installing", [False, True])
+def test_installer_skips_unneeded_pages_and_maintenance_opens_uninstaller(
+    monkeypatch: pytest.MonkeyPatch, installing: bool
+) -> None:
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    app = QGuiApplication.instance() or QGuiApplication([])
+    engine = QJSEngine(app)
+    result = engine.evaluate(
+        "var calls = [];"
+        "var QInstaller = {ComponentSelection: 0x3000, StartMenuSelection: 0x5000};"
+        "var installer = {"
+        f"isInstaller: function() {{ return {str(installing).lower()}; }},"
+        "setDefaultPageVisible: function(page, visible) { calls.push([page, visible]); },"
+        "environmentVariable: function(name) { return 'C:/Users/Test User/AppData/Local'; },"
+        "setValue: function(key, value) { calls.push([key, value]); },"
+        "setUninstaller: function() { calls.push(['uninstall']); }"
+        "};"
+    )
+    assert not result.isError(), result.toString()
+    script = PROJECT / "packaging" / "windows" / "config" / "controlscript.qs"
+    result = engine.evaluate(script.read_text(), str(script))
+    assert not result.isError(), result.toString()
+    result = engine.evaluate("new Controller(); calls;")
+    assert not result.isError(), result.toString()
+    assert result.toVariant() == [
+        [0x3000, False],
+        [0x5000, False],
+        ["TargetDir", "C:/Users/Test User/AppData/Local/Programs/Entropy"]
+        if installing
+        else ["uninstall"],
+    ]

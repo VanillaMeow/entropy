@@ -13,6 +13,6 @@
     <RemoveTargetDir>true</RemoveTargetDir>
     <WizardStyle>Modern</WizardStyle>
     <ControlScript>controlscript.qs</ControlScript>
-    <RunProgram>@TargetDir@/Entropy.exe</RunProgram>
+    <RunProgram>@TargetDir@/app/Entropy.exe</RunProgram>
     <RunProgramDescription>Launch Entropy</RunProgramDescription>
 </Installer>

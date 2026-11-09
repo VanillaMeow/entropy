@@ -1,7 +1,7 @@
 """Validated settings shared by the desktop UI and inference process."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -21,7 +21,7 @@ class ModelProfile(BaseModel):
     output_name: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
-    def paired_names(self) -> ModelProfile:
+    def paired_names(self) -> Self:
         """Require either two explicit tensor names or automatic discovery."""
         if (self.input_name is None) != (self.output_name is None):
             raise ValueError("Specify both input_name and output_name, or omit both.")

@@ -1,5 +1,6 @@
 """Qt Quick application bootstrap."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -41,10 +42,15 @@ def run() -> int:
     font = app.font()
     font.setPointSizeF(max(12, font.pointSizeF()))
     app.setFont(font)
-    controller = AppController()
+    startup_check = os.environ.get("ENTROPY_STARTUP_CHECK") == "1"
+    controller = AppController(start_setup=not startup_check)
     engine = create_engine(controller)
     if not engine.rootObjects():
         controller.shutdown()
         return 1
+    if startup_check:
+        for window in engine.rootObjects():
+            window.close()
+        return 0
     app.aboutToQuit.connect(controller.shutdown)
     return app.exec()

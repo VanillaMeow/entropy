@@ -140,6 +140,16 @@ def deploy_application(project: Path, staging: Path, native: Path) -> Path:
     shutil.copytree(
         project / "packaging" / "windows" / "licenses", payload / "licenses", dirs_exist_ok=True
     )
+    check_environment = environment.copy()
+    check_environment["ENTROPY_STARTUP_CHECK"] = "1"
+    check_environment["QT_QPA_PLATFORM"] = "offscreen"
+    subprocess.run(
+        [str(payload / "Entropy.exe")],
+        cwd=payload,
+        env=check_environment,
+        timeout=30,
+        check=True,
+    )
     return payload
 
 
@@ -169,7 +179,9 @@ def package_windows(project: Path, *, binarycreator: Path) -> Path:
         layout = staging / "installer"
         shutil.copytree(project / "packaging" / "windows", layout)
         component = layout / "packages" / COMPONENT
-        shutil.move(str(payload), component / "data")
+        # Keep the application's Qt DLLs away from the Qt IFW maintenance tool.
+        (component / "data").mkdir()
+        shutil.move(str(payload), component / "data" / "app")
         shutil.copy2(staging / "Entropy.ico", layout / "config" / "Entropy.ico")
         shutil.copy2(project / "LICENSE", component / "meta" / "LICENSE")
         shutil.copy2(

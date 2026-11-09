@@ -1,6 +1,7 @@
 """Qt Quick loading, view-model actions, and subprocess lifecycle checks."""
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -31,6 +32,28 @@ def qt_app() -> QGuiApplication:
 def controller(qt_app: QGuiApplication, tmp_path: Path) -> AppController:
     settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
     return AppController(settings=settings, start_setup=False)
+
+
+def test_startup_check_loads_workspace_without_model_setup(tmp_path: Path) -> None:
+    model_dir = tmp_path / "models"
+    environment = os.environ.copy()
+    environment.update(
+        ENTROPY_STARTUP_CHECK="1",
+        ENTROPY_MODEL_DIR=str(model_dir),
+        XDG_CONFIG_HOME=str(tmp_path / "settings"),
+        QT_QPA_PLATFORM="offscreen",
+        QT_QUICK_BACKEND="software",
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "src"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not model_dir.exists()
 
 
 def make_ready(controller: AppController, tmp_path: Path) -> Path:

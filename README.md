@@ -4,7 +4,7 @@ A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL and Metal back
 installs its default **Real-ESRGAN General 4×** enhancement model automatically.
 There is no model file picker or manual model configuration.
 
-The current prerelease is **v0.2.0-alpha.1** (`0.2.0a1` in Python package metadata).
+The current prerelease is **v0.2.1-alpha.1** (`0.2.1a1` in Python package metadata).
 
 The runtime automatically selects Metal on macOS and OpenCL on Linux and Windows;
 backend selection is internal. Metal is groundwork for future macOS support:
@@ -208,14 +208,18 @@ Tags with a prerelease suffix, such as `v0.1.0-alpha.1`, publish as GitHub
 prereleases; tags such as `v0.1.0` publish as stable releases.
 
 The workflow only builds, packages and publishes. It does not install the `dev`
-dependency group or run tests, smoke tests, GPU probes or lint checks. The Windows
+dependency group or run the test suite, GPU probes or lint checks. The Windows
 job builds MNN with MSVC, compiles the application with `pyside6-deploy` (Nuitka in
-standalone mode), then wraps it with Qt Installer Framework's `binarycreator`.
+standalone mode), checks that the compiled application can load its workspace
+without downloading a model, then wraps it with Qt Installer Framework's `binarycreator`.
 The application starts without a console window and uses its own executable for
 isolated GPU workers. It reads the bundled model from its installation directory
 and keeps user preferences and cached data in the existing per-user locations.
 The installer includes Start menu, desktop and uninstall shortcuts, with a
-maintenance tool also available through Windows Settings.
+maintenance tool also available through Windows Settings. The application and
+its Qt runtime live in the `app/` subdirectory, separate from the maintenance
+tool. Setup skips component and Start menu folder selection; uninstall opens
+the removal wizard and requires confirmation.
 
 To build the installer locally on Windows, use the x64 Native Tools Command Prompt
 and install the build tools and Qt Installer Framework:
