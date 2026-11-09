@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from src import engine
-from src.config import Backend, ModelProfile
+from src.config import ModelProfile
 from src.engine import InferenceError, MnnRunner
 
 
@@ -19,8 +19,8 @@ def test_unavailable_gpu_is_rejected(monkeypatch: pytest.MonkeyPatch, compiled: 
     )
     monkeypatch.setattr(engine, "import_mnn", lambda: fake)
     monkeypatch.setattr(engine, "is_compiled", lambda: compiled)
-    with pytest.raises(InferenceError, match="Vulkan could not initialize") as error:
-        MnnRunner("unused.mnn", ModelProfile(), Backend.VULKAN)
+    with pytest.raises(InferenceError, match="OpenCL could not initialize") as error:
+        MnnRunner("unused.mnn", ModelProfile())
     if compiled:
         assert "driver" in str(error.value)
         assert "uv run" not in str(error.value)
@@ -36,7 +36,7 @@ def native_cpu(monkeypatch: pytest.MonkeyPatch) -> Any:
         pytest.skip(str(exc))
     import MNN.expr as expr
 
-    monkeypatch.setattr(Backend, "mnn_id", property(lambda _: 0))
+    monkeypatch.setattr(engine, "OPENCL_BACKEND", 0)
     return expr
 
 
@@ -56,7 +56,7 @@ def test_native_dynamic_model_preserves_channels_and_scale(
 ) -> None:
     path = tmp_path / "resize.mnn"
     make_resize_model(native_cpu, path, layout, packed=packed)
-    runner = MnnRunner(str(path), ModelProfile(scale=2, layout=layout), Backend.OPENCL)
+    runner = MnnRunner(str(path), ModelProfile(scale=2, layout=layout))
     for height, width in [(6, 7), (9, 3), (1, 1)]:
         pixels = np.full((height, width, 3), [0.1, 0.4, 0.9], dtype=np.float32)
         output = runner.infer(pixels)
@@ -69,6 +69,6 @@ def test_native_dynamic_model_preserves_channels_and_scale(
 def test_native_scale_mismatch_is_rejected(native_cpu: Any, tmp_path: Path) -> None:
     path = tmp_path / "resize.mnn"
     make_resize_model(native_cpu, path, "NCHW")
-    runner = MnnRunner(str(path), ModelProfile(scale=4), Backend.OPENCL)
+    runner = MnnRunner(str(path), ModelProfile(scale=4))
     with pytest.raises(InferenceError, match="Check the model scale"):
         runner.infer(np.ones((4, 5, 3), dtype=np.float32))

@@ -23,6 +23,13 @@ Drawer {
                 font.pointSize: Theme.heading
                 Layout.fillWidth: true
             }
+            ActionButton {
+                objectName: "retrySetupButton"
+                text: qsTr("Retry setup")
+                symbol: "refresh"
+                enabled: !root.controller.busy
+                onClicked: root.controller.prepare()
+            }
             IconButton {
                 symbol: "close"
                 description: qsTr("Close diagnostics")

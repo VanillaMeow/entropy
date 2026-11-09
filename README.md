@@ -1,6 +1,6 @@
 # Entropy
 
-A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL and Vulkan. The app
+A PySide6 / Qt Quick desktop image upscaler using MNN with OpenCL. The app
 installs its default **Real-ESRGAN General 4×** enhancement model automatically.
 There is no model file picker or manual model configuration.
 
@@ -18,7 +18,7 @@ For Windows, download and run `entropy-windows-x86_64-setup.exe`. The installer
 installs Entropy for the current user under `%LOCALAPPDATA%\Programs\Entropy`,
 creates Start menu and desktop shortcuts, and registers an uninstaller in Windows
 Settings. Launch **Entropy** from the Start menu. The app includes its dependencies,
-the OpenCL/Vulkan runtime and the enhancement model; Python is not required.
+the OpenCL runtime and the enhancement model; Python is not required.
 Only a compatible GPU driver is needed. The installer displays the full
 **Mozilla Public License 2.0** and installs its text alongside the application.
 
@@ -29,8 +29,8 @@ uv run entropy
 
 On first launch, the app downloads and verifies the 4.9 MB default model. It
 shows download progress and caches the model for offline use. Add images,
-choose the output size and folder, select an available GPU backend, and upscale.
-The refresh button beside **GPU processing** retries setup and checks the runtime again.
+choose the output size and folder, and upscale. OpenCL acceleration is automatic.
+Use **Retry setup** in **Diagnostics** to retry model installation and check the runtime again.
 
 On this development machine the GPU runtime has already been built and installed.
 For a fresh Linux or Windows installation, build it once:
@@ -55,17 +55,17 @@ uv run python scripts/build_mnn.py --jobs 4
 uv run entropy
 ```
 
-Use x64 Python 3.14 and the x64 toolchain. The helper builds both OpenCL and Vulkan
+Use x64 Python 3.14 and the x64 toolchain. The helper builds OpenCL support
 into a static MNN runtime and installs the Python extension for the app; the
 standard MNN wheel is not a substitute for this GPU build. Install current GPU
-drivers providing OpenCL and/or Vulkan. A separate OpenCL or Vulkan SDK is not
+drivers providing OpenCL. A separate OpenCL SDK is not
 required. Qt uses its native Windows file dialogs, and output folders must be
 on a filesystem with hard-link support, such as NTFS; FAT32/exFAT are unsupported.
 macOS runtime builds are not enabled yet.
 
 The runtime is installed in the user's application data directory, separately
 from `.venv`. Normal `uv sync` does not remove it. The app prefers this runtime
-on subsequent worker launches, including after refreshing GPU setup.
+on subsequent worker launches, including after retrying setup from Diagnostics.
 Changing Python minor versions requires rebuilding for that Python ABI.
 
 ## Default model
@@ -152,7 +152,7 @@ scales above 4×, installers and Windows GPU validation are not included.
 
 The YAML manifest is `flatpak/io.github.jedace07.Entropy.yaml`. It uses the
 Freedesktop 26.08 runtime with Python 3.14, bundles PySide6 wheels, builds the
-pinned MNN runtime with OpenCL and Vulkan, and bundles the verified enhancement
+pinned MNN runtime with OpenCL, and bundles the verified enhancement
 model. Python dependencies are downloaded from the pinned sources in
 `flatpak/python-dependencies.yaml`.
 The build bootstraps a pinned uv executable from `flatpak/uv.yaml` and uses
@@ -193,7 +193,7 @@ Push a version tag such as `v0.1.0` to build both x86_64 packages:
 
 - `entropy-x86_64.flatpak` for Linux.
 - `entropy-windows-x86_64-setup.exe` for Windows, an offline Qt Installer Framework
-  installer containing the standalone application, dependencies, the OpenCL/Vulkan
+  installer containing the standalone application, dependencies, the OpenCL
   runtime, the enhancement model and license texts.
 
 Both builds must succeed before the workflow publishes a GitHub Release with
@@ -268,7 +268,7 @@ UPSCALER_TEST_PORTAL=1 uv run pytest tests/test_portal.py -v
 This test opens and automatically dismisses all three native pickers. It checks
 that each action sends exactly one portal request and needs `dbus-monitor`.
 
-Run the real default model on both GPU backends with:
+Run the real default model with OpenCL acceleration:
 
 ```bash
 UPSCALER_TEST_GPU=1 uv run pytest tests/test_gpu.py -v
@@ -279,9 +279,7 @@ it is not cached. They check dynamic tile inference, output dimensions and pixel
 sanity. GPU tests are opt-in and require suitable GPU hardware. Weekly dependency
 updates are configured.
 
-Local validation on Aurora 44 with an RTX 3080 and Intel UHD 750: both real-model
-GPU tests passed, as did the full Qt Quick setup → automatic model → Vulkan inference
-→ RGBA PNG export workflow. Availability is reported by MNN; inference checks
+Availability is reported by MNN; inference checks
 also validate output pixels so a successful probe alone is not treated as proof.
 
 ## License

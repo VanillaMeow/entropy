@@ -6,11 +6,12 @@ from typing import Any, Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from .config import Backend, ModelProfile
+from .config import ModelProfile
 from .paths import is_compiled
 from .runtime import activate_local_runtime
 
 FloatImage = NDArray[np.float32]
+OPENCL_BACKEND = 3
 
 
 class InferenceError(RuntimeError):
@@ -43,17 +44,13 @@ def import_mnn() -> Any:
         ) from exc
 
 
-def available_backends(mnn: Any) -> dict[Backend, bool]:
+def opencl_available(mnn: Any) -> bool:
     """Probe runtime creation, including driver availability.
 
     MNN.nn does not expose a capability query. The legacy Interpreter static
     method is used only for this check; inference uses the maintained nn API.
     """
-    return {backend: _backend_available(mnn, backend) for backend in Backend}
-
-
-def _backend_available(mnn: Any, backend: Backend) -> bool:
-    runtime, supported = mnn.Interpreter.createRuntime(({"backend": backend.mnn_id},))
+    runtime, supported = mnn.Interpreter.createRuntime(({"backend": OPENCL_BACKEND},))
     available = bool(supported[0])
     del runtime
     return available
@@ -62,16 +59,16 @@ def _backend_available(mnn: Any, backend: Backend) -> bool:
 class MnnRunner:
     """Run a dynamic RGB model with MNN's Module/RuntimeManager API."""
 
-    def __init__(self, model_path: str, profile: ModelProfile, backend: Backend) -> None:
+    def __init__(self, model_path: str, profile: ModelProfile) -> None:
         self._mnn = import_mnn()
-        if not _backend_available(self._mnn, backend):
+        if not opencl_available(self._mnn):
             if is_compiled():
                 raise InferenceError(
-                    f"{backend.value} could not initialize. Check that a compatible GPU "
+                    "OpenCL could not initialize. Check that a compatible GPU "
                     "driver is installed, then retry setup."
                 )
             raise InferenceError(
-                f"{backend.value} could not initialize. The standard MNN wheel omits GPU backends. "
+                "OpenCL could not initialize. The standard MNN wheel omits OpenCL support. "
                 "Run 'uv run python scripts/build_mnn.py' to build a GPU runtime. "
                 "If already built, check the GPU driver and runtime diagnostics."
             )
@@ -79,9 +76,9 @@ class MnnRunner:
         nn = import_module("MNN.nn")
         self._profile = profile
         self._runtime = nn.create_runtime_manager(
-            ({"backend": backend.mnn_id, "precision": "high", "numThread": 4},)
+            ({"backend": OPENCL_BACKEND, "precision": "high", "numThread": 4},)
         )
-        # Fix the requested primary backend; MNN may still run unsupported ops on CPU.
+        # Keep OpenCL as the primary backend; MNN may run unsupported ops on CPU.
         self._runtime.set_mode(8)
         self._module = nn.load_module_from_file(
             model_path,
@@ -129,5 +126,7 @@ class MnnRunner:
                 "Check the model scale and layout in its JSON profile."
             )
         if not np.isfinite(result).all():
-            raise InferenceError("Model returned non-finite pixels; try another model or backend.")
+            raise InferenceError(
+                "Model returned non-finite pixels; check the model and GPU driver."
+            )
         return np.clip(result[0], 0, 1)

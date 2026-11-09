@@ -20,7 +20,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtQml import QmlElement, QmlUncreatable
 
-from .config import Backend, UpscaleRequest
+from .config import UpscaleRequest
 from .imaging import SUPPORTED_SUFFIXES
 from .models import DEFAULT_PROFILE
 from .preview import image_aspect, preview_url
@@ -65,14 +65,13 @@ class AppController(QObject):
         self._request: UpscaleRequest | None = None
         self._preparing = False
         self._model_ready = False
-        self._backends: dict[str, bool] = {}
+        self._runtime_ready = False
         self._selected = -1
         self._progress = 0.0
         self._indeterminate = False
         self._error = False
         self._status = self.tr("Ready when you are")
         self._model_status = self.tr("Installs automatically · 4.9 MB")
-        self._backend_status = self.tr("Checking GPU support…")
         self._logs: list[str] = []
         self._terminal_event = False
         self._start_time = 0.0
@@ -80,9 +79,6 @@ class AppController(QObject):
         self._output = str(
             self._settings.value("output", str(Path(pictures or Path.home()) / "Upscaled"))
         )
-        self._backend = str(self._settings.value("backend", Backend.VULKAN.value))
-        if self._backend not in {backend.value for backend in Backend}:
-            self._backend = Backend.VULKAN.value
         self._tile = int(self._settings.value("tileSize", 128))
         self._padding = int(self._settings.value("padding", 16))
         try:
@@ -126,10 +122,7 @@ class AppController(QObject):
             not self.busy
             and self._queue.count > 0
             and bool(self._output.strip())
-            and (
-                self._output_scale <= 1
-                or (self._model_ready and self._backends.get(self._backend, False))
-            )
+            and (self._output_scale <= 1 or (self._model_ready and self._runtime_ready))
         )
 
     @Property(str, notify=stateChanged)
@@ -139,10 +132,6 @@ class AppController(QObject):
     @Property(str, notify=stateChanged)
     def modelStatus(self) -> str:
         return self._model_status
-
-    @Property(str, notify=stateChanged)
-    def backendStatus(self) -> str:
-        return self._backend_status
 
     @Property("double", notify=stateChanged)
     def progress(self) -> float:
@@ -221,17 +210,6 @@ class AppController(QObject):
     @Property(QUrl, notify=settingsChanged)
     def outputUrl(self) -> QUrl:
         return QUrl.fromLocalFile(str(Path(self._output).expanduser().resolve()))
-
-    @Property(str, notify=settingsChanged)
-    def backend(self) -> str:
-        return self._backend
-
-    @backend.setter
-    def backend(self, value: str) -> None:
-        if self.canEdit and value in {b.value for b in Backend} and value != self._backend:
-            self._backend = value
-            self.settingsChanged.emit()
-            self.stateChanged.emit()
 
     @Property("double", notify=settingsChanged)
     def outputScale(self) -> float:
@@ -354,7 +332,6 @@ class AppController(QObject):
         self._terminal_event = False
         self._error = False
         self._status = self.tr("Preparing your workspace…")
-        self._backend_status = self.tr("Checking GPU support…")
         self._worker.start("--prepare")
         self.stateChanged.emit()
 
@@ -369,7 +346,6 @@ class AppController(QObject):
                 output_dir=Path(self._output).expanduser().resolve(),
                 profile=DEFAULT_PROFILE,
                 output_scale=self._output_scale,
-                backend=Backend(self._backend),
                 tile_size=self._tile,
                 padding=self._padding,
             )
@@ -433,19 +409,11 @@ class AppController(QObject):
         elif kind == "model_ready":
             self._model_ready = True
             self._model_status = self.tr("Ready for offline use")
-        elif kind == "backends":
+        elif kind == "runtime_ready":
             self._terminal_event = True
-            self._backends = event["available"]
-            self._backend_status = " · ".join(
-                f"{name}: {self.tr('ready') if ready else self.tr('unavailable')}"
-                for name, ready in self._backends.items()
-            )
-            if not self._backends.get(self._backend, False):
-                self._backend = next(
-                    (name for name, ready in self._backends.items() if ready), self._backend
-                )
-                self.settingsChanged.emit()
-            if any(self._backends.values()):
+            self._runtime_ready = event["available"]
+            self._log(f"OpenCL: {'ready' if self._runtime_ready else 'unavailable'}")
+            if self._runtime_ready:
                 self._status = self.tr("Ready when you are")
             else:
                 self._set_error(self.tr("GPU setup is required. Open diagnostics for details."))
@@ -488,8 +456,7 @@ class AppController(QObject):
             self._terminal_event = True
             self._set_error(event["message"])
             if self._preparing:
-                self._backends.clear()
-                self._backend_status = self.tr("GPU check failed")
+                self._runtime_ready = False
         elif kind == "complete":
             self._terminal_event = True
             self._progress, self._indeterminate = 1.0, False
@@ -533,7 +500,6 @@ class AppController(QObject):
         self._worker.shutdown()
         for key, value in (
             ("output", self._output),
-            ("backend", self._backend),
             ("tileSize", self._tile),
             ("padding", self._padding),
             ("outputScale", self._output_scale),

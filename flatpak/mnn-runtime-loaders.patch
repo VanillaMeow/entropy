@@ -8,13 +8,3 @@
          "/usr/lib/libOpenCL.so",
          "/usr/local/lib/libOpenCL.so",
          "/usr/local/lib/libpocl.so",
---- a/source/backend/vulkan/runtime/vulkan_wrapper.cpp
-+++ b/source/backend/vulkan/runtime/vulkan_wrapper.cpp
-@@ -35,6 +35,7 @@
- #ifdef _WIN32
-     "vulkan-1.dll",
- #endif
-+    "libvulkan.so.1",
-     "libvulkan.so",
- #if defined(__APPLE__) || defined(__MACOSX)
-     "/usr/local/lib/libvulkan.dylib",// For mac install vk driver

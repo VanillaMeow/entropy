@@ -92,7 +92,7 @@ class WorkerProcess(QObject):
     def _timeout(self) -> None:
         self._timed_out = True
         self.event.emit(
-            {"event": "error", "message": "GPU backend check timed out after 30 seconds."}
+            {"event": "error", "message": "GPU setup check timed out after 30 seconds."}
         )
         if self._process is not None:
             self._process.kill()

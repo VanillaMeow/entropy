@@ -43,7 +43,8 @@ def test_build_activates_runtime_only_after_successful_install(
             assert cwd == package
             wheel_dir = package / "dist"
             wheel_dir.mkdir()
-            (wheel_dir / "mnn_vulkan_opencl-test.whl").touch()
+            assert command[-2:] == ["--deps", "opencl"]
+            (wheel_dir / "mnn_opencl-test.whl").touch()
         elif command[:3] == ["uv", "pip", "install"] and "--target" in command:
             if install_fails:
                 raise subprocess.CalledProcessError(1, command)
@@ -84,12 +85,12 @@ def test_build_activates_runtime_only_after_successful_install(
         assert build_mnn.main() == 0
         metadata = json.loads((root / "active.json").read_text())
         assert (root / metadata["directory"] / "MNN" / "__init__.py").is_file()
-        assert metadata["compiled_backends"] == ["OpenCL", "Vulkan"]
+        assert metadata["compiled_backends"] == ["OpenCL"]
         assert metadata["linux_runtime_sonames"] is not windows
         assert metadata["source_commit"] == build_mnn.MNN_COMMIT
 
     configure = next(command for command, _, _ in calls if command[:2] == ["cmake", "-S"])
-    assert "-DMNN_OPENCL=ON" in configure and "-DMNN_VULKAN=ON" in configure
+    assert "-DMNN_OPENCL=ON" in configure and "-DMNN_VULKAN=OFF" in configure
     build = next(command for command, _, _ in calls if command[:2] == ["cmake", "--build"])
     assert build[-2:] == ["--parallel", "2"]
     wheel_env = next(env for command, _, env in calls if "setup.py" in command)

@@ -45,7 +45,7 @@ def build_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, P
     monkeypatch.setattr(
         package_windows,
         "activate_local_runtime",
-        lambda: {"directory": native.name, "compiled_backends": ["OpenCL", "Vulkan"]},
+        lambda: {"directory": native.name, "compiled_backends": ["OpenCL"]},
     )
     monkeypatch.setattr(package_windows, "application_version", lambda: "0.1.0-alpha.1")
     monkeypatch.setattr(package_windows, "distributions", lambda: ())

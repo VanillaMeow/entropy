@@ -1,4 +1,4 @@
-"""Build and install a per-user MNN 3.6.2 runtime with OpenCL and Vulkan.
+"""Build and install a per-user MNN 3.6.2 runtime with OpenCL.
 
 Run from the project with ``uv run python scripts/build_mnn.py``. Nothing is
 installed system-wide or into the application's uv-managed site-packages.
@@ -29,11 +29,6 @@ def patch_linux_loaders(source: Path) -> None:
             "source/backend/opencl/core/runtime/OpenCLWrapper.cpp",
             "#elif defined(__linux__)\n",
             '#elif defined(__linux__)\n        "libOpenCL.so.1",\n',
-        ),
-        (
-            "source/backend/vulkan/runtime/vulkan_wrapper.cpp",
-            '"libvulkan.so",',
-            '"libvulkan.so.1",\n    "libvulkan.so",',
         ),
     )
     for relative, original, replacement in patches:
@@ -150,8 +145,7 @@ def main() -> int:
             # MNN forces __STRICT_ANSI__; use strict C++11 consistently with GCC 16.
             "-DCMAKE_CXX_EXTENSIONS=OFF",
             "-DMNN_OPENCL=ON",
-            "-DMNN_VULKAN=ON",
-            "-DMNN_VULKAN_IMAGE=OFF",
+            "-DMNN_VULKAN=OFF",
             "-DMNN_BUILD_SHARED_LIBS=OFF",
             "-DMNN_SEP_BUILD=OFF",
             "-DMNN_BUILD_TRAIN=ON",
@@ -185,13 +179,11 @@ def main() -> int:
     else:
         build_settings["LDFLAGS"] = "-Wl,-z,noexecstack"
     run(
-        [python, "setup.py", "build_ext", "--force", "bdist_wheel", "--deps", "opencl,vulkan"],
+        [python, "setup.py", "build_ext", "--force", "bdist_wheel", "--deps", "opencl"],
         cwd=package,
         env=build_settings,
     )
-    wheels = sorted(
-        (package / "dist").glob("mnn_vulkan_opencl-*.whl"), key=lambda p: p.stat().st_mtime
-    )
+    wheels = sorted((package / "dist").glob("mnn_opencl-*.whl"), key=lambda p: p.stat().st_mtime)
     if not wheels:
         raise RuntimeError("The MNN build did not produce a GPU-enabled wheel.")
 
@@ -218,7 +210,7 @@ def main() -> int:
                 "directory": target.name,
                 "version": MNN_VERSION,
                 "source_commit": MNN_COMMIT,
-                "compiled_backends": ["OpenCL", "Vulkan"],
+                "compiled_backends": ["OpenCL"],
                 "linux_runtime_sonames": not windows,
             },
             indent=2,
@@ -227,7 +219,7 @@ def main() -> int:
     )
     manifest.replace(root / "active.json")
     print(f"GPU-enabled MNN runtime installed in {target}", flush=True)
-    print("Restart the app, or click Retry setup / check GPU.", flush=True)
+    print("Restart the app, or click Retry setup in Diagnostics.", flush=True)
     return 0
 
 

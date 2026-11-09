@@ -15,7 +15,7 @@ from typing import Any
 from PIL import Image
 
 from .config import UpscaleRequest
-from .engine import MnnRunner, available_backends, import_mnn
+from .engine import MnnRunner, import_mnn, opencl_available
 from .imaging import load_image, save_output, upscale_image
 from .models import ensure_default_model
 
@@ -36,8 +36,8 @@ def run_batch(request: UpscaleRequest) -> int:
         model_path = request.model_path or _prepare_model()
         if not model_path.is_file() or model_path.suffix.lower() != ".mnn":
             raise ValueError("The enhancement model is missing. Retry model installation.")
-        emit("status", message=f"Initializing {request.backend.value}…")
-        runner = MnnRunner(str(model_path), request.profile, request.backend)
+        emit("status", message="Preparing enhancement…")
+        runner = MnnRunner(str(model_path), request.profile)
     failed = 0
     for index, path in enumerate(request.images):
         emit("started", index=index, source=str(path))
@@ -84,7 +84,7 @@ def _prepare_model() -> Path:
 
 
 def main() -> int:
-    """Probe GPU runtimes or execute a request from a local JSON file."""
+    """Probe OpenCL or execute a request from a local JSON file."""
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
     warnings.simplefilter("error", Image.DecompressionBombWarning)
     try:
@@ -92,10 +92,9 @@ def main() -> int:
             if sys.argv[1] == "--prepare":
                 _prepare_model()
             mnn = import_mnn()
-            backends = available_backends(mnn)
             emit(
-                "backends",
-                available={key.value: value for key, value in backends.items()},
+                "runtime_ready",
+                available=opencl_available(mnn),
                 runtime_path=mnn.__file__,
             )
             return 0

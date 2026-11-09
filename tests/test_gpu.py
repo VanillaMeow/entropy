@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.config import Backend
-from src.engine import MnnRunner, available_backends, import_mnn
+from src.engine import MnnRunner, import_mnn, opencl_available
 from src.imaging import upscale_image
 from src.models import DEFAULT_PROFILE, ensure_default_model
 
@@ -15,11 +14,10 @@ from src.models import DEFAULT_PROFILE, ensure_default_model
 @pytest.mark.skipif(
     os.environ.get("UPSCALER_TEST_GPU") != "1", reason="Set UPSCALER_TEST_GPU=1 on a GPU host"
 )
-@pytest.mark.parametrize("backend", list(Backend))
 @pytest.mark.parametrize("output_scale", [1.5, 2, 3, 4])
-def test_default_model_on_gpu(backend: Backend, output_scale: float) -> None:
-    assert available_backends(import_mnn())[backend], f"{backend.value} must be available"
-    runner = MnnRunner(str(ensure_default_model()), DEFAULT_PROFILE, backend)
+def test_default_model_on_gpu(output_scale: float) -> None:
+    assert opencl_available(import_mnn()), "OpenCL must be available"
+    runner = MnnRunner(str(ensure_default_model()), DEFAULT_PROFILE)
     image = Image.new("RGB", (19, 13), (128, 128, 128))
     progress = []
     result = upscale_image(

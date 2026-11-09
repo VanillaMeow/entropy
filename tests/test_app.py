@@ -39,7 +39,7 @@ def make_ready(controller: AppController, tmp_path: Path) -> Path:
     controller.add_paths([image, image, tmp_path])
     controller.outputDirectory = str(tmp_path / "output")
     controller._handle_event({"event": "model_ready"})
-    controller._handle_event({"event": "backends", "available": {"OpenCL": True, "Vulkan": True}})
+    controller._handle_event({"event": "runtime_ready", "available": True})
     return image
 
 
@@ -96,6 +96,8 @@ def test_qml_workspace_loads_in_both_themes_and_compact_layout(
         qt_app.processEvents()
     window.setProperty("diagnosticsOpen", True)
     qt_app.processEvents()
+    retry = window.findChild(QObject, "retrySetupButton")
+    assert retry and retry.property("enabled")
     controller.removeSelected()
     qt_app.processEvents()
     assert controller.selectedIndex == -1
@@ -202,6 +204,32 @@ def test_downscale_needs_no_model_or_gpu(controller: AppController, tmp_path: Pa
     assert controller.canStart
     controller.outputScale = 1.01
     assert not controller.canStart
+
+
+def test_saved_backend_is_ignored_and_runtime_failure_blocks_upscaling(
+    controller: AppController, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller._settings.setValue("backend", "Vulkan")
+    restored = AppController(settings=controller._settings, start_setup=False)
+    make_ready(restored, tmp_path)
+    assert restored.canStart
+    assert restored.metaObject().indexOfProperty("backend") == -1
+    assert restored.metaObject().indexOfProperty("backendStatus") == -1
+    restored._handle_event({"event": "runtime_ready", "available": False})
+    assert not restored.canStart
+    assert restored.hasError
+    assert "OpenCL: unavailable" in restored.diagnostics
+    starts = []
+    monkeypatch.setattr(restored._worker, "start", starts.append)
+    restored.prepare()
+    assert starts == ["--prepare"]
+    restored._handle_event({"event": "runtime_ready", "available": True})
+    restored._finished(0, False)
+    assert restored.canStart and not restored.hasError
+    restored.startBatch()
+    assert "backend" not in restored._request.model_dump()
+    restored._finished(0, False)
+    restored.shutdown()
 
 
 def test_scale_validation_and_busy_lock(controller: AppController) -> None:

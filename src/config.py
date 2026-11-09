@@ -1,23 +1,10 @@
 """Validated settings shared by the desktop UI and inference process."""
 
-from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-
-class Backend(StrEnum):
-    """GPU runtimes supported by this application."""
-
-    OPENCL = "OpenCL"
-    VULKAN = "Vulkan"
-
-    @property
-    def mnn_id(self) -> int:
-        """Return the backend identifier used by MNN."""
-        return {Backend.OPENCL: 3, Backend.VULKAN: 7}[self]
 
 
 class ModelProfile(BaseModel):
@@ -51,7 +38,6 @@ class UpscaleRequest(BaseModel):
     output_dir: Path
     profile: ModelProfile = Field(default_factory=ModelProfile)
     output_scale: float = Field(default=4.0, ge=0.1, le=4.0, allow_inf_nan=False)
-    backend: Backend = Backend.OPENCL
     tile_size: int = Field(default=128, ge=16, le=1024)
     padding: int = Field(default=16, ge=0, le=128)
     job_id: UUID = Field(default_factory=uuid4)

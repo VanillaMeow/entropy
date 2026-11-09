@@ -154,8 +154,8 @@ def package_windows(project: Path, *, binarycreator: Path) -> Path:
     if not binarycreator.is_file():
         raise RuntimeError(f"Qt Installer Framework binarycreator was not found: {binarycreator}")
     metadata = activate_local_runtime()
-    if metadata is None or set(metadata.get("compiled_backends", [])) != {"OpenCL", "Vulkan"}:
-        raise RuntimeError("Build the OpenCL/Vulkan runtime with scripts/build_mnn.py first.")
+    if metadata is None or set(metadata.get("compiled_backends", [])) != {"OpenCL"}:
+        raise RuntimeError("Build the OpenCL runtime with scripts/build_mnn.py first.")
     native = runtime_root() / metadata["directory"]
     project = project.resolve()
     build = project / "build"

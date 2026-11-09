@@ -41,7 +41,7 @@ modules:
         cmake -S . -B pymnn_build -G Ninja
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DCMAKE_CXX_EXTENSIONS=OFF
-        -DMNN_OPENCL=ON -DMNN_VULKAN=ON -DMNN_VULKAN_IMAGE=OFF
+        -DMNN_OPENCL=ON -DMNN_VULKAN=OFF
         -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_SEP_BUILD=OFF
         -DMNN_BUILD_TRAIN=ON -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=OFF
         -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON -DMNN_BUILD_AUDIO=ON
@@ -51,8 +51,8 @@ modules:
       - cmake --build pymnn_build --target MNN MNNTrain MNNConvertDeps --parallel "$FLATPAK_BUILDER_N_JOBS"
       - >-
         cd pymnn/pip_package && python3 setup.py build_ext --force bdist_wheel
-        --deps opencl,vulkan && uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index
-        --no-deps dist/mnn_vulkan_opencl-*.whl
+        --deps opencl && uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index
+        --no-deps dist/mnn_opencl-*.whl
       - install -d /app/etc/OpenCL
       - ln -s "/usr/lib/${FLATPAK_ARCH}-linux-gnu/GL/OpenCL/vendors" /app/etc/OpenCL/vendors
     sources:

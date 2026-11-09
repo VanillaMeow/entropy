@@ -31,39 +31,6 @@ Rectangle {
                 implicitHeight: 1
                 color: Theme.outline
             }
-            RowLayout {
-                Layout.fillWidth: true
-                SectionLabel {
-                    text: qsTr("GPU PROCESSING")
-                    Layout.fillWidth: true
-                }
-                IconButton {
-                    symbol: "refresh"
-                    description: qsTr("Retry setup and check GPU")
-                    enabled: !root.controller.busy
-                    onClicked: root.controller.prepare()
-                }
-            }
-            ComboBox {
-                Layout.fillWidth: true
-                model: ["Vulkan", "OpenCL"]
-                currentIndex: root.controller.backend === "Vulkan" ? 0 : 1
-                enabled: root.controller.canEdit
-                Accessible.name: qsTr("GPU backend")
-                onActivated: root.controller.backend = currentText
-            }
-            Label {
-                Layout.fillWidth: true
-                text: root.controller.backendStatus
-                color: Theme.muted
-                font.pointSize: Theme.caption
-                wrapMode: Text.WordWrap
-            }
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: Theme.outline
-            }
             SectionLabel {
                 text: qsTr("SAVE TO")
             }

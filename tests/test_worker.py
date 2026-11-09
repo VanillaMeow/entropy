@@ -1,7 +1,9 @@
 """A failed image must not hide successful work or stop the remaining batch."""
 
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -11,9 +13,33 @@ from src.config import ModelProfile, UpscaleRequest
 from src.engine import FloatImage
 
 
-def test_application_entry_point_dispatches_worker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    import sys
+@pytest.mark.parametrize("available", [False, True])
+def test_probe_reports_opencl_readiness(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], available: bool
+) -> None:
+    configurations = []
 
+    def create_runtime(config: tuple[dict[str, int], ...]) -> tuple[object, tuple[bool]]:
+        configurations.append(config)
+        return object(), (available,)
+
+    mnn = SimpleNamespace(
+        __file__="test-runtime/MNN/__init__.py",
+        Interpreter=SimpleNamespace(createRuntime=create_runtime),
+    )
+    monkeypatch.setattr(sys, "argv", ["worker", "--probe"])
+    monkeypatch.setattr(worker, "import_mnn", lambda: mnn)
+    assert worker.main() == 0
+    assert configurations == [({"backend": 3},)]
+    event = json.loads(capsys.readouterr().out.strip().removeprefix(worker.EVENT_PREFIX))
+    assert event == {
+        "event": "runtime_ready",
+        "available": available,
+        "runtime_path": mnn.__file__,
+    }
+
+
+def test_application_entry_point_dispatches_worker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     import src
     from src import app
 
@@ -76,7 +102,7 @@ def test_batch_exports_requested_scale(
     initialized = []
 
     class Runner:
-        def __init__(self, path: str, profile: ModelProfile, backend: object) -> None:
+        def __init__(self, path: str, profile: ModelProfile) -> None:
             initialized.append(profile.scale)
 
         def infer(self, pixels: FloatImage) -> FloatImage:
