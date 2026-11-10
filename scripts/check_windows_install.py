@@ -57,6 +57,33 @@ def main() -> int:
             timeout=90,
         )
         print(f"Worker without a parent console: {detached_result.read_text()}", flush=True)
+        qt_helper = root / "qt-worker.py"
+        qt_result = root / "qt-worker.json"
+        qt_helper.write_text(
+            "import json, sys\n"
+            "from pathlib import Path\n"
+            "from PySide6.QtCore import QCoreApplication, QProcess, QTimer\n"
+            "app = QCoreApplication([])\n"
+            "p = QProcess()\n"
+            "def finished(code, status):\n"
+            "    Path(sys.argv[2]).write_text(json.dumps({'code': code, 'status': str(status), "
+            "'stdout': bytes(p.readAllStandardOutput()).decode(errors='replace'), "
+            "'stderr': bytes(p.readAllStandardError()).decode(errors='replace'), "
+            "'error': p.errorString()}))\n"
+            "    app.quit()\n"
+            "p.finished.connect(finished)\n"
+            "p.start(sys.argv[1], ['--worker', '--prepare'])\n"
+            "QTimer.singleShot(60000, app.quit)\n"
+            "app.exec()\n",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            [sys.executable, str(qt_helper), str(application), str(qt_result)],
+            creationflags=subprocess.DETACHED_PROCESS,
+            check=True,
+            timeout=90,
+        )
+        print(f"Worker launched by QProcess: {qt_result.read_text()}", flush=True)
         gui_log = root / "application.log"
         with gui_log.open("w+", encoding="utf-8") as output:
             gui = subprocess.Popen(

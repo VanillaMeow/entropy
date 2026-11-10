@@ -20,6 +20,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: astral-sh/setup-uv@v10.3.3
+
       - name: Download published installer
         env:
           GH_TOKEN: ${{ github.token }}
@@ -27,4 +29,4 @@ jobs:
         run: gh release download "$env:RELEASE_TAG" --pattern entropy-windows-x86_64-setup.exe --dir dist
 
       - name: Check installed worker and maintenance tool
-        run: python scripts/check_windows_install.py dist/entropy-windows-x86_64-setup.exe
+        run: uv run --no-project --with PySide6==6.12.0 python scripts/check_windows_install.py dist/entropy-windows-x86_64-setup.exe
