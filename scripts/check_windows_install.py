@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument("installer", type=Path)
     installer = parser.parse_args().installer.resolve()
     with tempfile.TemporaryDirectory(prefix="entropy install ") as temporary:
-        root = Path(temporary)
+        root = Path(temporary).resolve()
         target = root / "Entropy"
         run(
             [
