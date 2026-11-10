@@ -207,8 +207,9 @@ Ordinary pushes and pull requests do not run a workflow.
 Tags with a prerelease suffix, such as `v0.1.0-alpha.1`, publish as GitHub
 prereleases; tags such as `v0.1.0` publish as stable releases.
 
-The workflow only builds, packages and publishes. It does not install the `dev`
-dependency group or run the test suite, GPU probes or lint checks. The Windows
+The workflow builds, validates the Windows installation, packages and publishes.
+It does not install the `dev` dependency group or run the test suite, GPU inference
+tests or lint checks. The Windows
 job builds MNN with MSVC, compiles the application with `pyside6-deploy` (Nuitka in
 standalone mode), checks that the compiled application can load its workspace
 without downloading a model, then wraps it with Qt Installer Framework's `binarycreator`.

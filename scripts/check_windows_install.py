@@ -173,7 +173,10 @@ def main() -> int:
                 "powershell",
                 "-NoProfile",
                 "-Command",
-                "Get-Process EntropyMaintenanceTool -ErrorAction SilentlyContinue | Stop-Process",
+                "$entropyProcesses = @(Get-Process EntropyMaintenanceTool "
+                "-ErrorAction SilentlyContinue); "
+                "foreach ($entropyProcess in $entropyProcesses) { "
+                "Stop-Process -Id $entropyProcess.Id -ErrorAction Stop }; exit 0",
             ]
         )
         run([str(target / "EntropyMaintenanceTool.exe"), "--confirm-command", "purge"])
