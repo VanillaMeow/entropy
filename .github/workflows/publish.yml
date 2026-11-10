@@ -65,6 +65,9 @@ jobs:
       - name: Build Windows application and installer
         run: uv run --locked --no-dev --group windows-build python scripts/package_windows.py
 
+      - name: Check installed application and uninstall flow
+        run: uv run --locked --no-dev --group windows-build python scripts/check_windows_install.py dist/entropy-windows-x86_64-setup.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64

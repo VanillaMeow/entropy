@@ -113,7 +113,6 @@ class WorkerProcess(QObject):
         process = self._process
         if process is None:
             return
-        self._probe_timeout.stop()
         self._read_stdout()
         self._read_stderr()
         if status == QProcess.ExitStatus.CrashExit and not self._cancelled and not self._timed_out:

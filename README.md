@@ -212,6 +212,9 @@ dependency group or run the test suite, GPU probes or lint checks. The Windows
 job builds MNN with MSVC, compiles the application with `pyside6-deploy` (Nuitka in
 standalone mode), checks that the compiled application can load its workspace
 without downloading a model, then wraps it with Qt Installer Framework's `binarycreator`.
+Before publishing, it installs the package on Windows, checks the GUI's MNN worker
+handshake and the registered uninstall confirmation, verifies cancellation preserves
+the application, and confirms removal deletes the app and Windows Settings entry.
 The application starts without a console window and uses its own executable for
 isolated GPU workers. It reads the bundled model from its installation directory
 and keeps user preferences and cached data in the existing per-user locations.
