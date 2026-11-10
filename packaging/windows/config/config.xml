@@ -10,6 +10,7 @@
     <StartMenuDir>Entropy</StartMenuDir>
     <TargetDir>@HomeDir@/Entropy</TargetDir>
     <MaintenanceToolName>EntropyMaintenanceTool</MaintenanceToolName>
+    <SupportsModify>false</SupportsModify>
     <RemoveTargetDir>true</RemoveTargetDir>
     <WizardStyle>Modern</WizardStyle>
     <ControlScript>controlscript.qs</ControlScript>

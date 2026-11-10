@@ -110,6 +110,7 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         settings = ElementTree.parse(config).getroot()
         assert settings.findtext("Version") == "0.1.0-alpha.1"
         assert settings.findtext("MaintenanceToolName") == "EntropyMaintenanceTool"
+        assert settings.findtext("SupportsModify") == "false"
         assert settings.findtext("RunProgram") == "@TargetDir@/app/Entropy.exe"
         with Image.open(config.with_name("Entropy.ico")) as icon:
             assert icon.format == "ICO"
