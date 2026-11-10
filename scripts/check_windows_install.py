@@ -84,6 +84,37 @@ def main() -> int:
             timeout=90,
         )
         print(f"Worker launched by QProcess: {qt_result.read_text()}", flush=True)
+        trace_script = root / "trace.ps1"
+        trace_ready = root / "trace.ready"
+        trace_file = root / "trace.json"
+        trace_script.write_text(
+            "param($Ready, $Result)\n"
+            "Register-CimIndicationEvent -ClassName Win32_ProcessStartTrace "
+            "-SourceIdentifier EntropyStart | Out-Null\n"
+            "Register-CimIndicationEvent -ClassName Win32_ProcessStopTrace "
+            "-SourceIdentifier EntropyStop | Out-Null\n"
+            "Set-Content $Ready ready\n"
+            "Start-Sleep 20\n"
+            "Get-Event | ForEach-Object { $_.SourceEventArgs.NewEvent } | "
+            "Where-Object { $_.ProcessName -eq 'Entropy.exe' } | "
+            "Select-Object ProcessName,ProcessID,ParentProcessID,ExitStatus | "
+            "ConvertTo-Json | Set-Content $Result\n",
+            encoding="utf-8",
+        )
+        trace = subprocess.Popen(
+            [
+                "powershell",
+                "-NoProfile",
+                "-File",
+                str(trace_script),
+                str(trace_ready),
+                str(trace_file),
+            ]
+        )
+        for _ in range(100):
+            if trace_ready.exists():
+                break
+            time.sleep(0.1)
         gui_log = root / "application.log"
         with gui_log.open("w+", encoding="utf-8") as output:
             gui = subprocess.Popen(
@@ -120,6 +151,8 @@ def main() -> int:
             gui.wait(timeout=10)
             output.seek(0)
             print(f"Application diagnostics:\n{output.read()}", flush=True)
+        trace.wait(timeout=30)
+        print(f"Windows process events: {trace_file.read_text()}", flush=True)
         run(
             [
                 "powershell",
