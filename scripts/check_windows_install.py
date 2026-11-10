@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,9 @@ def main() -> int:
             timeout=90,
         )
         print(f"Worker launched by QProcess: {qt_result.read_text()}", flush=True)
+        if os.environ.get("ENTROPY_TEST_REPAIR_WORKER") == "true":
+            # Diagnostic fixture only: Nuitka points sys.executable at a missing python.exe.
+            shutil.copy2(application, application.with_name("python.exe"))
         trace_script = root / "trace.ps1"
         trace_ready = root / "trace.ready"
         trace_file = root / "trace.json"
@@ -165,11 +169,7 @@ def main() -> int:
         )
         maintenance = target / "EntropyMaintenanceTool.exe"
         packages = run([str(maintenance), "--verbose", "list"])
-        subprocess.Popen(
-            [str(maintenance)],
-            cwd=Path(os.environ["WINDIR"]) / "System32",
-            creationflags=subprocess.DETACHED_PROCESS,
-        )
+        os.startfile(str(maintenance), cwd=str(Path(os.environ["WINDIR"]) / "System32"))
         time.sleep(10)
         run(
             [

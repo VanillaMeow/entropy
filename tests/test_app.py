@@ -309,12 +309,16 @@ def test_subprocess_cancellation_reaps_child(qt_app: QGuiApplication) -> None:
 def test_compiled_worker_launches_the_application_executable(
     qt_app: QGuiApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from PySide6.QtCore import QProcess
+    from PySide6.QtCore import QCoreApplication, QProcess
 
     from src import process as process_module
 
     launches = []
     monkeypatch.setattr(process_module, "is_compiled", lambda: True)
+    monkeypatch.setattr(sys, "executable", "/missing/python.exe")
+    monkeypatch.setattr(
+        QCoreApplication, "applicationFilePath", lambda: "C:/Program Files/Entropy/app/Entropy.exe"
+    )
     monkeypatch.setattr(
         QProcess,
         "start",
@@ -322,5 +326,31 @@ def test_compiled_worker_launches_the_application_executable(
     )
     process = WorkerProcess()
     process.start("--prepare")
-    assert launches == [(sys.executable, ["--worker", "--prepare"])]
+    assert launches == [("C:/Program Files/Entropy/app/Entropy.exe", ["--worker", "--prepare"])]
     process.shutdown()
+
+
+def test_failed_worker_start_keeps_the_original_error(
+    qt_app: QGuiApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sys, "executable", "/missing/entropy/python.exe")
+    process = WorkerProcess()
+    events = []
+    finished = []
+    loop = QEventLoop()
+    process.event.connect(events.append)
+    process.finished.connect(
+        lambda code, cancelled: (finished.append((code, cancelled)), loop.quit())
+    )
+    process.start("--probe")
+    timer = QTimer()
+    timer.setSingleShot(True)
+    timer.timeout.connect(loop.quit)
+    timer.start(5000)
+    loop.exec()
+    timer.stop()
+    process.shutdown()
+    assert finished == [(-1, False)]
+    assert len(events) == 1
+    assert "crashed" not in events[0]["message"]
+    assert not process.running

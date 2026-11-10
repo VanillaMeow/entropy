@@ -4,7 +4,7 @@ import json
 import sys
 from typing import Any
 
-from PySide6.QtCore import QObject, QProcess, QTimer, Signal
+from PySide6.QtCore import QCoreApplication, QObject, QProcess, QTimer, Signal
 
 from .paths import is_compiled
 from .worker import EVENT_PREFIX
@@ -52,7 +52,8 @@ class WorkerProcess(QObject):
             if is_compiled()
             else ["-u", "-m", f"{__package__}.worker", argument]
         )
-        process.start(sys.executable, arguments)
+        executable = QCoreApplication.applicationFilePath() if is_compiled() else sys.executable
+        process.start(executable, arguments)
         if argument == "--probe":
             self._probe_timeout.start(30000)
 
@@ -106,7 +107,7 @@ class WorkerProcess(QObject):
     def _on_error(self, error: QProcess.ProcessError) -> None:
         if error == QProcess.ProcessError.FailedToStart and self._process is not None:
             self.event.emit({"event": "error", "message": self._process.errorString()})
-            self._on_finished(-1, QProcess.ExitStatus.CrashExit)
+            self._finish(-1)
 
     def _on_finished(self, code: int, status: QProcess.ExitStatus) -> None:
         process = self._process
@@ -119,6 +120,12 @@ class WorkerProcess(QObject):
             self.event.emit(
                 {"event": "error", "message": "The native MNN worker crashed. See details below."}
             )
-        self._process = None
-        process.deleteLater()
-        self.finished.emit(code, self._cancelled)
+        self._finish(code)
+
+    def _finish(self, code: int) -> None:
+        process = self._process
+        if process is not None:
+            self._probe_timeout.stop()
+            self._process = None
+            process.deleteLater()
+            self.finished.emit(code, self._cancelled)
