@@ -75,6 +75,16 @@ def main() -> int:
                     "$root = [System.Windows.Automation.AutomationElement]::RootElement; "
                     "$all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, "
                     "[System.Windows.Automation.Condition]::TrueCondition); "
+                    "$button = $all | Where-Object { $_.Current.Name -eq 'Open diagnostics' } | "
+                    "Select-Object -First 1; "
+                    "if ($button) { $button.GetCurrentPattern("
+                    "[System.Windows.Automation.InvokePattern]::Pattern).Invoke(); "
+                    "Start-Sleep 1 }; "
+                    "$all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, "
+                    "[System.Windows.Automation.Condition]::TrueCondition); "
+                    "$all | ForEach-Object { "
+                    "try { $_.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)"
+                    ".Current.Value } catch {} }; "
                     "$all | ForEach-Object { $_.Current } | "
                     "Select-Object ProcessId,Name,AutomationId | ConvertTo-Json -Compress",
                 ]
@@ -83,6 +93,16 @@ def main() -> int:
             gui.wait(timeout=10)
             output.seek(0)
             print(f"Application diagnostics:\n{output.read()}", flush=True)
+        run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2; "
+                "StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue | "
+                "Select-Object TimeCreated,ProviderName,Message | ConvertTo-Json",
+            ]
+        )
         maintenance = target / "EntropyMaintenanceTool.exe"
         packages = run([str(maintenance), "--verbose", "list"])
         subprocess.Popen(
