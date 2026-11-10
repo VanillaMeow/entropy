@@ -7,5 +7,8 @@ function Controller() {
             installer.setValue("TargetDir", localAppData + "/Programs/Entropy");
     } else {
         installer.setUninstaller();
+        installer.setCompleteUninstallation(true);
+        installer.setDefaultPageVisible(QInstaller.Introduction, false);
+        installer.setDefaultPageVisible(QInstaller.LicenseCheck, false);
     }
 }

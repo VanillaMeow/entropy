@@ -214,13 +214,15 @@ def test_installer_skips_unneeded_pages_and_maintenance_opens_uninstaller(
     engine = QJSEngine(app)
     result = engine.evaluate(
         "var calls = [];"
-        "var QInstaller = {ComponentSelection: 0x3000, StartMenuSelection: 0x5000};"
+        "var QInstaller = {Introduction: 0x1000, ComponentSelection: 0x3000, "
+        "LicenseCheck: 0x4000, StartMenuSelection: 0x5000};"
         "var installer = {"
         f"isInstaller: function() {{ return {str(installing).lower()}; }},"
         "setDefaultPageVisible: function(page, visible) { calls.push([page, visible]); },"
         "environmentVariable: function(name) { return 'C:/Users/Test User/AppData/Local'; },"
         "setValue: function(key, value) { calls.push([key, value]); },"
-        "setUninstaller: function() { calls.push(['uninstall']); }"
+        "setUninstaller: function() { calls.push(['uninstall']); },"
+        "setCompleteUninstallation: function(complete) { calls.push(['complete', complete]); }"
         "};"
     )
     assert not result.isError(), result.toString()
@@ -232,7 +234,8 @@ def test_installer_skips_unneeded_pages_and_maintenance_opens_uninstaller(
     assert result.toVariant() == [
         [0x3000, False],
         [0x5000, False],
-        ["TargetDir", "C:/Users/Test User/AppData/Local/Programs/Entropy"]
+    ] + (
+        [["TargetDir", "C:/Users/Test User/AppData/Local/Programs/Entropy"]]
         if installing
-        else ["uninstall"],
-    ]
+        else [["uninstall"], ["complete", True], [0x1000, False], [0x4000, False]]
+    )

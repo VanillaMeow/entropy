@@ -7,6 +7,10 @@ on:
         description: Release tag to check
         required: true
         default: v0.2.1-alpha.1
+      repackage:
+        description: Diagnose current installer scripts with the published payload and repaired worker path
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -26,5 +30,39 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: gh release download "$env:RELEASE_TAG" --pattern entropy-windows-x86_64-setup.exe --dir dist
 
+      - uses: astral-sh/setup-uv@v10.3.3
+        if: inputs.repackage
+
+      - name: Create diagnostic installer from published payload
+        if: inputs.repackage
+        run: |
+          uv tool run --from aqtinstall==3.3.0 aqt install-tool windows desktop tools_ifw qt.tools.ifw.47 --outputdir "$env:RUNNER_TEMP/qtifw"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tools = (Get-ChildItem "$env:RUNNER_TEMP/qtifw" -Recurse -Filter binarycreator.exe | Select-Object -First 1).DirectoryName
+          $dump = "$env:RUNNER_TEMP/entropy-dump"
+          & "$tools/devtool.exe" dump dist/entropy-windows-x86_64-setup.exe $dump
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $layout = "$env:RUNNER_TEMP/entropy-fixture"
+          New-Item -ItemType Directory -Path $layout | Out-Null
+          Copy-Item packaging/windows/* $layout -Recurse
+          $data = "$layout/packages/io.github.jedace07.Entropy/data"
+          $archive = Get-ChildItem "$dump/metadata/io.github.jedace07.Entropy/*app.7z" | Select-Object -First 1
+          & 7z x $archive.FullName "-o$data" -y -bso0 -bsp0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Diagnostic fixture only: prove the old worker's missing python.exe path.
+          Copy-Item "$data/app/Entropy.exe" "$data/app/python.exe"
+          Copy-Item "$data/app/Entropy.ico" "$layout/config/Entropy.ico"
+          Copy-Item LICENSE "$layout/packages/io.github.jedace07.Entropy/meta/LICENSE"
+          Copy-Item src/licenses/Real-ESRGAN.txt "$layout/packages/io.github.jedace07.Entropy/meta/Real-ESRGAN.txt"
+          foreach ($metadata in @("$layout/config/config.xml", "$layout/packages/io.github.jedace07.Entropy/meta/package.xml")) {
+            (Get-Content $metadata -Raw).Replace('@VERSION@', '0.2.1-alpha.1').Replace('@RELEASE_DATE@', (Get-Date -Format yyyy-MM-dd)) | Set-Content $metadata -Encoding utf8
+          }
+          & "$tools/binarycreator.exe" --offline-only --config "$layout/config/config.xml" --packages "$layout/packages" dist/entropy-diagnostic-setup.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Check installed worker and maintenance tool
-        run: python scripts/check_windows_install.py dist/entropy-windows-x86_64-setup.exe
+        env:
+          REPACKAGE: ${{ inputs.repackage }}
+        run: |
+          $installer = if ($env:REPACKAGE -eq 'true') { 'dist/entropy-diagnostic-setup.exe' } else { 'dist/entropy-windows-x86_64-setup.exe' }
+          python scripts/check_windows_install.py $installer
