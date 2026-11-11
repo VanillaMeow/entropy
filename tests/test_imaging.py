@@ -6,8 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.engine import FloatImage
-from src.imaging import load_image, save_output, upscale_image
+from src.core.imaging import FloatImage, load_image, save_output, upscale_image
 
 
 class NearestRunner:
@@ -20,7 +19,7 @@ class NearestRunner:
 def test_tiles_cover_every_pixel_without_seams(size: tuple[int, int], padding: int) -> None:
     width, height = size
     pixels = np.random.default_rng(42).integers(0, 256, (height, width, 3), dtype=np.uint8)
-    progress = []
+    progress: list[tuple[int, int]] = []
     result = upscale_image(
         Image.fromarray(pixels),
         NearestRunner(),
@@ -39,7 +38,7 @@ def test_alpha_is_preserved(mode: str) -> None:
     rgba = Image.new("RGBA", (5, 7), (100, 150, 200, 80))
     image = rgba.convert(mode)
     result = upscale_image(
-        image, NearestRunner(), scale=2, tile_size=16, padding=4, progress=lambda *_: None
+        image, NearestRunner(), scale=2, tile_size=16, padding=4, progress=lambda _done, _total: None
     )
     expected = image.convert("RGBA").getchannel("A").resize(result.size, Image.Resampling.LANCZOS)
     assert result.mode == "RGBA"
@@ -60,7 +59,7 @@ def test_custom_output_sizes_and_metadata(output_scale: float, mode: str) -> Non
         output_scale=output_scale,
         tile_size=16,
         padding=4,
-        progress=lambda *_: None,
+        progress=lambda _done, _total: None,
     )
     assert result.size == (max(1, round(19 * output_scale)), max(1, round(11 * output_scale)))
     assert result.info.get("icc_profile") == (
@@ -84,7 +83,7 @@ def test_tiny_downscale_stays_at_least_one_pixel() -> None:
         output_scale=0.1,
         tile_size=16,
         padding=0,
-        progress=lambda *_: None,
+        progress=lambda _done, _total: None,
     )
     assert result.size == (1, 1)
 
@@ -149,5 +148,5 @@ def test_invalid_tensor_output_is_rejected(bad_shape: bool) -> None:
             scale=2,
             tile_size=16,
             padding=0,
-            progress=lambda *_: None,
+            progress=lambda _done, _total: None,
         )

@@ -19,9 +19,8 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, QTimer, QObject, QMetaObject, Qt, Q_ARG
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuickControls2 import QQuickStyle
-from src.dialogs import configure_file_portal
-from src.controller import AppController
-from src.app import create_engine
+from src.ui.dialogs import configure_file_portal
+from src.application import Entropy
 
 configure_file_portal()
 QQuickStyle.setStyle("Material")
@@ -33,9 +32,9 @@ try:
     with TemporaryDirectory(prefix="upscaler-portal-test-") as directory:
         app = QGuiApplication([])
         settings = QSettings(str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat)
-        controller = AppController(settings=settings, start_setup=False)
-        controller.outputDirectory = directory
-        engine = create_engine(controller)
+        entropy = Entropy(settings=settings, start_setup=False)
+        entropy.ui.controller.outputDirectory = directory
+        engine = entropy.ui.load()
         assert engine.rootObjects()
         window = engine.rootObjects()[0]
         pickers = window.findChild(QObject, "filePickers")
@@ -61,7 +60,12 @@ print("Verified exactly three native portal requests: images, input folder, outp
     environment = os.environ.copy()
     environment.update(QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
     result = subprocess.run(
-        [sys.executable, "-c", script], env=environment, text=True, capture_output=True, timeout=20
+        [sys.executable, "-c", script],
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "TypeError" not in result.stderr, result.stderr

@@ -1,5 +1,6 @@
 """Support ``python -m src``."""
 
-from . import main
+from src.launcher import main
 
-raise SystemExit(main())
+if __name__ == '__main__':
+    raise SystemExit(main())

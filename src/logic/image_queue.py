@@ -1,12 +1,39 @@
-"""The image queue exposed to Qt Quick as a native list model."""
+"""The image queue, exposed to Qt Quick as a native list model."""
 
+import base64
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import ClassVar, override
 
-from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, Qt, QUrl, Signal
+from PySide6.QtCore import (
+    Property,
+    QAbstractListModel,
+    QByteArray,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    Qt,
+    QUrl,
+    Signal,
+)
 
-from .preview import preview_url
+# Registered by the UI as the image provider that decodes preview_url() tokens
+PREVIEW_PROVIDER = 'preview'
+
+type ModelIndex = QModelIndex | QPersistentModelIndex
+
+
+class EntryState(StrEnum):
+    """Processing state of one image; QML compares and translates these values."""
+
+    READY = 'Ready'
+    QUEUED = 'Queued'
+    PROCESSING = 'Processing'
+    DONE = 'Done'
+    FAILED = 'Failed'
+    CANCELLED = 'Cancelled'
+    NOT_COMPLETED = 'Not completed'
 
 
 @dataclass
@@ -14,35 +41,55 @@ class QueueEntry:
     """Source, output, and processing state for one image."""
 
     path: Path
-    state: str = "Ready"
+    state: EntryState = EntryState.READY
     output: Path | None = None
     output_scale: float | None = None
-    error: str = ""
+    error: str = ''
+
+
+def preview_url(path: Path | None) -> QUrl:
+    """Encode a local path as an unambiguous image-provider URL."""
+    if path is None:
+        return QUrl()
+    token = base64.urlsafe_b64encode(str(path).encode()).decode('ascii')
+    return QUrl(f'image://{PREVIEW_PROVIDER}/{token}')
+
+
+def preview_path(token: str) -> Path:
+    """Decode a token produced by preview_url()."""
+    return Path(base64.urlsafe_b64decode(token).decode())
 
 
 class ImageQueue(QAbstractListModel):
     """Provide stable, explicit roles to reusable QML thumbnail delegates."""
 
     changed = Signal()
-    _names = ("fileName", "sourceUrl", "outputUrl", "state", "errorText", "previewUrl")
-    _roles = {int(Qt.ItemDataRole.UserRole) + i: name.encode() for i, name in enumerate(_names)}
 
-    def __init__(self, parent: Any = None) -> None:
+    _NAMES: ClassVar = ('fileName', 'sourceUrl', 'outputUrl', 'state', 'errorText', 'previewUrl')
+    _ROLES: ClassVar = {
+        Qt.ItemDataRole.UserRole + offset: QByteArray(name.encode())
+        for offset, name in enumerate(_NAMES)
+    }
+
+    def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.entries: list[QueueEntry] = []
 
-    @Property(int, notify=changed)
-    def count(self) -> int:
-        """Number of images in the queue."""
+    def _count(self) -> int:
         return len(self.entries)
 
-    def rowCount(self, parent: QModelIndex | None = None) -> int:
+    count = Property(int, _count, notify=changed)
+
+    @override
+    def rowCount(self, parent: ModelIndex | None = None) -> int:
         return 0 if parent is not None and parent.isValid() else len(self.entries)
 
-    def roleNames(self) -> dict[int, bytes]:
-        return self._roles
+    @override
+    def roleNames(self) -> dict[int, QByteArray]:
+        return self._ROLES
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    @override
+    def data(self, index: ModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> object:
         if not index.isValid() or not 0 <= index.row() < len(self.entries):
             return None
         entry = self.entries[index.row()]
@@ -50,17 +97,17 @@ class ImageQueue(QAbstractListModel):
             entry.path.name,
             QUrl.fromLocalFile(str(entry.path)),
             QUrl.fromLocalFile(str(entry.output)) if entry.output else QUrl(),
-            entry.state,
+            entry.state.value,
             entry.error,
             preview_url(entry.path),
         )
-        offset = role - int(Qt.ItemDataRole.UserRole)
+        offset = role - Qt.ItemDataRole.UserRole
         return values[offset] if 0 <= offset < len(values) else None
 
     def append(self, paths: list[Path]) -> None:
         """Insert unique file paths while retaining the existing order."""
         existing = {entry.path for entry in self.entries}
-        additions = []
+        additions: list[QueueEntry] = []
         for path in paths:
             if path not in existing:
                 additions.append(QueueEntry(path))
@@ -91,14 +138,14 @@ class ImageQueue(QAbstractListModel):
         self,
         row: int,
         *,
-        state: str,
+        state: EntryState,
         output: Path | None = None,
         output_scale: float | None = None,
-        error: str = "",
+        error: str = '',
     ) -> None:
         """Publish processing changes for exactly one delegate."""
         entry = self.entries[row]
         entry.state, entry.output, entry.error = state, output, error
         entry.output_scale = output_scale
         index = self.index(row)
-        self.dataChanged.emit(index, index, list(self._roles))
+        self.dataChanged.emit(index, index, list(self._ROLES))

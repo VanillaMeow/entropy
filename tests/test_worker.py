@@ -1,6 +1,6 @@
 """A failed image must not hide successful work or stop the remaining batch."""
 
-import json
+import io
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,9 +8,19 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src import engine, worker
-from src.config import ModelProfile, UpscaleRequest
-from src.engine import FloatImage
+import src
+from src import application
+from src import worker as worker_package
+from src.core.config import ModelProfile, UpscaleRequest
+from src.core.events import Complete, ImageError, RuntimeReady, Saved, WorkerEvent, decode
+from src.core.imaging import FloatImage
+from src.worker import engine
+from src.worker import process as worker
+
+
+def events(output: str) -> list[WorkerEvent]:
+    """Parse the protocol lines from captured worker stdout, skipping other output."""
+    return [event for line in output.splitlines() if (event := decode(line)) is not None]
 
 
 @pytest.mark.parametrize("available", [False, True])
@@ -22,7 +32,7 @@ def test_probe_reports_platform_gpu_readiness(
     platform_name: str,
     backend_id: int,
 ) -> None:
-    configurations = []
+    configurations: list[tuple[dict[str, int], ...]] = []
 
     def create_runtime(config: tuple[dict[str, int], ...]) -> tuple[object, tuple[bool]]:
         configurations.append(config)
@@ -37,42 +47,62 @@ def test_probe_reports_platform_gpu_readiness(
     monkeypatch.setattr(worker, "import_mnn", lambda: mnn)
     assert worker.main() == 0
     assert configurations == [({"backend": backend_id},)]
-    event = json.loads(capsys.readouterr().out.strip().removeprefix(worker.EVENT_PREFIX))
-    assert event == {
-        "event": "runtime_ready",
-        "available": available,
-        "runtime_path": mnn.__file__,
-    }
+    assert events(capsys.readouterr().out) == [
+        RuntimeReady(available=available, runtime_path=mnn.__file__)
+    ]
+
+
+def test_job_reads_its_request_from_stdin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    image = tmp_path / "input.png"
+    Image.new("RGB", (6, 4)).save(image)
+    request = UpscaleRequest(images=(image,), output_dir=tmp_path / "output", output_scale=0.5)
+    stdin = SimpleNamespace(buffer=io.BytesIO(request.model_dump_json().encode()))
+    monkeypatch.setattr(sys, "argv", ["worker", "--job"])
+    monkeypatch.setattr(sys, "stdin", stdin)
+    assert worker.main() == 0
+    assert events(capsys.readouterr().out)[-1] == Complete(succeeded=1, failed=0)
+
+
+def test_unknown_mode_reports_an_error_event(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["worker", "--nonsense"])
+    assert worker.main() == 1
+    (event,) = events(capsys.readouterr().out)
+    assert event.event == "error"
 
 
 def test_application_entry_point_dispatches_worker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src
-    from src import app
-
-    calls = []
+    calls: list[list[str]] = []
 
     def run_worker() -> int:
         calls.append(sys.argv[1:])
         return 7
 
+    def run_gui() -> int:
+        pytest.fail("Worker mode must not launch the GUI")
+
     monkeypatch.setattr(sys, "argv", ["Entropy.exe", "--worker", "--probe"])
-    monkeypatch.setattr(worker, "main", run_worker)
-    monkeypatch.setattr(app, "run", lambda: pytest.fail("Worker mode must not launch the GUI"))
+    monkeypatch.setattr(worker_package, "main", run_worker)
+    monkeypatch.setattr(application, "run", run_gui)
     assert src.main() == 7
     assert calls == [["--probe"]]
+
+
+class DoublingRunner:
+    def __init__(self, *_: object) -> None:
+        pass
+
+    def infer(self, pixels: FloatImage) -> FloatImage:
+        return pixels.repeat(2, 0).repeat(2, 1)
 
 
 def test_batch_continues_after_corrupt_image(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    class Runner:
-        def __init__(self, *_: object) -> None:
-            pass
-
-        def infer(self, pixels: FloatImage) -> FloatImage:
-            return pixels.repeat(2, 0).repeat(2, 1)
-
-    monkeypatch.setattr(worker, "MnnRunner", Runner)
+    monkeypatch.setattr(worker, "MnnRunner", DoublingRunner)
     bad, good, model = tmp_path / "bad.png", tmp_path / "good.png", tmp_path / "model.mnn"
     bad.write_bytes(b"not an image")
     Image.new("RGB", (19, 11), "red").save(good)
@@ -86,13 +116,9 @@ def test_batch_continues_after_corrupt_image(
         tile_size=16,
     )
     assert worker.run_batch(request) == 1
-    events = [
-        json.loads(line[len(worker.EVENT_PREFIX) :])
-        for line in capsys.readouterr().out.splitlines()
-        if line.startswith(worker.EVENT_PREFIX)
-    ]
-    assert any(e["event"] == "image_error" and e["index"] == 0 for e in events)
-    assert events[-1] == {"event": "complete", "succeeded": 1, "failed": 1}
+    reported = events(capsys.readouterr().out)
+    assert any(isinstance(e, ImageError) and e.index == 0 for e in reported)
+    assert reported[-1] == Complete(succeeded=1, failed=1)
     with Image.open(request.output_dir / "good_2x.png") as result:
         assert result.size == (38, 22)
     assert not request.staging_path.exists()
@@ -105,7 +131,7 @@ def test_batch_exports_requested_scale(
     capsys: pytest.CaptureFixture[str],
     scale: float,
 ) -> None:
-    initialized = []
+    initialized: list[int] = []
 
     class Runner:
         def __init__(self, path: str, profile: ModelProfile) -> None:
@@ -118,7 +144,7 @@ def test_batch_exports_requested_scale(
         pytest.fail("Resizing must not install an enhancement model")
 
     monkeypatch.setattr(worker, "MnnRunner", Runner)
-    monkeypatch.setattr(worker, "_prepare_model", no_download)
+    monkeypatch.setattr(worker, "prepare_model", no_download)
     image, model = tmp_path / "input.png", tmp_path / "model.mnn"
     Image.new("RGBA", (19, 11), (100, 150, 200, 80)).save(image)
     if scale > 1:
@@ -136,12 +162,7 @@ def test_batch_exports_requested_scale(
     with Image.open(destination) as result:
         assert result.size == (max(1, round(19 * scale)), max(1, round(11 * scale)))
         assert result.mode == "RGBA"
-    events = [
-        json.loads(line[len(worker.EVENT_PREFIX) :])
-        for line in capsys.readouterr().out.splitlines()
-        if line.startswith(worker.EVENT_PREFIX)
-    ]
-    saved = next(event for event in events if event["event"] == "saved")
-    assert saved["output_scale"] == scale
-    assert saved["output"] == str(destination)
+    saved = next(e for e in events(capsys.readouterr().out) if isinstance(e, Saved))
+    assert saved.output_scale == scale
+    assert saved.output == destination
     assert not request.staging_path.exists()

@@ -13,25 +13,26 @@ class ModelProfile(BaseModel):
     Tensor names are discovered from the model when both names are omitted.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra='forbid', frozen=True)
 
     scale: int = Field(default=4, ge=2, le=8)
-    layout: Literal["NCHW", "NHWC"] = "NCHW"
+    layout: Literal['NCHW', 'NHWC'] = 'NCHW'
     input_name: str | None = Field(default=None, min_length=1)
     output_name: str | None = Field(default=None, min_length=1)
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def paired_names(self) -> Self:
         """Require either two explicit tensor names or automatic discovery."""
         if (self.input_name is None) != (self.output_name is None):
-            raise ValueError("Specify both input_name and output_name, or omit both.")
+            msg = 'Specify both input_name and output_name, or omit both.'
+            raise ValueError(msg)
         return self
 
 
 class UpscaleRequest(BaseModel):
     """Immutable batch request crossing the subprocess boundary."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra='forbid', frozen=True)
 
     images: tuple[Path, ...] = Field(min_length=1)
     model_path: Path | None = None
@@ -45,4 +46,4 @@ class UpscaleRequest(BaseModel):
     @property
     def staging_path(self) -> Path:
         """Return the single scratch output owned by this batch."""
-        return self.output_dir / f".entropy-{self.job_id}.tmp"
+        return self.output_dir / f'.entropy-{self.job_id}.tmp'

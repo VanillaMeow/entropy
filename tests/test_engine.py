@@ -1,15 +1,16 @@
 """Exercise the native Module API on CPU and GPU availability errors separately."""
 
+from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pytest
 
-from src import engine
-from src.config import ModelProfile
-from src.engine import InferenceError, MnnRunner
+from src.worker import engine
+from src.core.config import ModelProfile
+from src.worker.engine import InferenceError, MnnRunner
 
 
 @pytest.mark.parametrize("compiled", [False, True])
@@ -19,9 +20,10 @@ from src.engine import InferenceError, MnnRunner
 def test_unavailable_gpu_is_rejected(
     monkeypatch: pytest.MonkeyPatch, compiled: bool, platform_name: str, backend: str
 ) -> None:
-    fake = SimpleNamespace(
-        Interpreter=SimpleNamespace(createRuntime=lambda _: (object(), (False,)))
-    )
+    def create_runtime(_: object) -> tuple[object, tuple[bool]]:
+        return object(), (False,)
+
+    fake = SimpleNamespace(Interpreter=SimpleNamespace(createRuntime=create_runtime))
     monkeypatch.setattr(engine, "import_mnn", lambda: fake)
     monkeypatch.setattr(engine, "is_compiled", lambda: compiled)
     monkeypatch.setattr(engine, "sys", SimpleNamespace(platform=platform_name))
@@ -39,7 +41,8 @@ def test_unavailable_gpu_is_rejected(
 def test_probe_and_inference_use_the_platform_gpu(
     monkeypatch: pytest.MonkeyPatch, platform_name: str, backend_id: int
 ) -> None:
-    probes, runtimes = [], []
+    probes: list[tuple[dict[str, int], ...]] = []
+    runtimes: list[tuple[dict[str, object], ...]] = []
 
     def create_runtime(config: tuple[dict[str, int], ...]) -> tuple[object, tuple[bool]]:
         probes.append(config)
@@ -71,13 +74,15 @@ def native_cpu(monkeypatch: pytest.MonkeyPatch) -> Any:
         engine.import_mnn()
     except InferenceError as exc:
         pytest.skip(str(exc))
-    import MNN.expr as expr
-
+    # MNN is an optional, locally built runtime that pyright cannot see
+    expr = import_module("MNN.expr")
     monkeypatch.setattr(engine, "gpu_backend", lambda: ("CPU", 0))
     return expr
 
 
-def make_resize_model(expr: Any, path: Path, layout: str, *, packed: bool = False) -> None:
+def make_resize_model(
+    expr: Any, path: Path, layout: Literal["NCHW", "NHWC"], *, packed: bool = False
+) -> None:
     shape = [1, 3, 4, 5] if layout == "NCHW" else [1, 4, 5, 3]
     order = expr.NCHW if layout == "NCHW" else expr.NHWC
     source = expr.placeholder(shape, expr.NC4HW4 if packed else order)
@@ -89,7 +94,7 @@ def make_resize_model(expr: Any, path: Path, layout: str, *, packed: bool = Fals
 
 @pytest.mark.parametrize("layout,packed", [("NCHW", False), ("NHWC", False), ("NCHW", True)])
 def test_native_dynamic_model_preserves_channels_and_scale(
-    native_cpu: Any, tmp_path: Path, layout: str, packed: bool
+    native_cpu: Any, tmp_path: Path, layout: Literal["NCHW", "NHWC"], packed: bool
 ) -> None:
     path = tmp_path / "resize.mnn"
     make_resize_model(native_cpu, path, layout, packed=packed)

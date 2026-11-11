@@ -17,12 +17,12 @@ def configure_file_portal() -> None:
     parent on Wayland. QML FileDialog/FolderDialog retain their native defaults.
     On systems without the plugin, Qt can still use its built-in QML picker.
     """
-    if sys.platform != "linux":
+    if sys.platform != 'linux':
         return
     plugins = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath))
-    if not (plugins / "platformthemes" / "libqxdgdesktopportal.so").is_file():
+    if not (plugins / 'platformthemes' / 'libqxdgdesktopportal.so').is_file():
         logger.warning(
             "Qt's xdg-desktop-portal plugin is missing; native portal dialogs unavailable"
         )
         return
-    os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
+    os.environ['QT_QPA_PLATFORMTHEME'] = 'xdgdesktopportal'

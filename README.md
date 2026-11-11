@@ -119,11 +119,31 @@ The PySide6 wheel includes the Qt portal plugin; the desktop needs a running
 `xdg-desktop-portal-kde` or `xdg-desktop-portal-gnome`. When native dialogs are
 unavailable Qt can use its QML fallback; a missing plugin is logged.
 
-`app.py` bootstraps the application; `controller.py` exposes typed properties and
-actions; `queue.py` supplies the list model. `qml/Main.qml` wires together focused
-components for the workspace, comparison, queue, settings, dialogs, and status.
-The `qml/components/` directory contains reusable controls and `Theme.qml` holds
-the color and typography tokens. Native inference remains in its own process.
+The `src` package is split by responsibility:
+
+- `core/` holds pure logic shared by both processes, with no Qt: the request
+  model, image tiling, model download, and the typed worker events.
+- `worker/` is the inference process: MNN loading and the batch runner.
+- `logic/` is the desktop process's state, using QtCore only: the `Session`
+  (queue, preferences, batch and setup lifecycle), the image list model, typed
+  settings, and the `WorkerHost` that runs and talks to the worker.
+- `ui/` is everything Qt Quick touches: the `AppController` view model, the
+  preview image provider, and the QML sources.
+
+`application.py` holds `Entropy`, which owns the settings, worker host, session
+and interface, and passes itself to each part. The session never calls into the
+interface; it emits signals that the view model forwards to QML.
+
+Native inference runs in a separate child process, so a crashing GPU driver
+cannot take the app down and a batch can be cancelled even inside a native call.
+The desktop app sends the batch request as JSON on the worker's stdin, and the
+worker reports one JSON event per line on stdout. MNN prints its own logs to
+the same stream, so event lines carry a prefix and all other output goes to the
+diagnostics panel. Both sides share the pydantic models in `core/events.py`.
+
+In `ui/qml/`, `Main.qml` wires together focused components for the workspace,
+comparison, queue, settings, dialogs, and status. The `components/` directory
+contains reusable controls and `Theme.qml` holds the color and typography tokens.
 
 ## Features and limits
 
@@ -255,12 +275,23 @@ flatpak install --user entropy-x86_64.flatpak
 
 ```bash
 uv sync --extra mnn
-uv run ruff check src scripts tests
-uv run ruff format --check src scripts tests
+uv run python scripts/generate_stubs.py
+uv run ruff check
+uv run ruff format --check
+uv run pyright
 uv run python scripts/check_qml.py --check
 uv run pytest -ra
 uv build
 ```
+
+Pyright runs in strict mode over `src`, `scripts` and `tests`. PySide6's bundled
+type stubs miss a few things, such as typed `Property` descriptors, so
+`scripts/generate_stubs.py` mirrors them into `typings/` with targeted patches.
+The mirror is generated, not committed: run the script after `uv sync` and after
+every PySide6 upgrade. `--check` reports a missing or stale mirror. Because of
+this, read/write Qt properties use the explicit form,
+`outputScale = Property(float, _get, _set, notify=...)`, since strict pyright
+treats the `@x.setter` pattern as a redeclaration.
 
 Normal tests use generated models on CPU to check native tensor conversion,
 including packed layouts, plus download integrity/offline reuse, tiling, image

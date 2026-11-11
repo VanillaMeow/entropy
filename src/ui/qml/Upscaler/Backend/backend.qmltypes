@@ -7,7 +7,7 @@ import QtQuick.tooling 1.2
 
 Module {
     Component {
-        file: "src/controller.py"
+        file: "src/ui/controller.py"
         lineNumber: 0
         name: "AppController"
         accessSemantics: "reference"
@@ -96,19 +96,11 @@ Module {
             isReadonly: true
         }
         Property {
-            name: "bodyFontSize"
-            type: "double"
-            read: "bodyFontSize"
-            index: 10
-            isReadonly: true
-            isPropertyConstant: true
-        }
-        Property {
             name: "indeterminate"
             type: "bool"
             read: "indeterminate"
             notify: "stateChanged"
-            index: 11
+            index: 10
             isReadonly: true
         }
         Property {
@@ -116,7 +108,7 @@ Module {
             type: "bool"
             read: "hasError"
             notify: "stateChanged"
-            index: 12
+            index: 11
             isReadonly: true
         }
         Property {
@@ -124,8 +116,16 @@ Module {
             type: "QString"
             read: "diagnostics"
             notify: "diagnosticsChanged"
+            index: 12
+            isReadonly: true
+        }
+        Property {
+            name: "bodyFontSize"
+            type: "double"
+            read: "bodyFontSize"
             index: 13
             isReadonly: true
+            isPropertyConstant: true
         }
         Property {
             name: "selectedIndex"
@@ -152,11 +152,19 @@ Module {
             isReadonly: true
         }
         Property {
+            name: "originalPreviewUrl"
+            type: "QUrl"
+            read: "originalPreviewUrl"
+            notify: "selectionChanged"
+            index: 17
+            isReadonly: true
+        }
+        Property {
             name: "resultUrl"
             type: "QUrl"
             read: "resultUrl"
             notify: "selectionChanged"
-            index: 17
+            index: 18
             isReadonly: true
         }
         Property {
@@ -164,7 +172,7 @@ Module {
             type: "bool"
             read: "hasResult"
             notify: "selectionChanged"
-            index: 18
+            index: 19
             isReadonly: true
         }
         Property {
@@ -172,7 +180,7 @@ Module {
             type: "double"
             read: "resultScale"
             notify: "selectionChanged"
-            index: 19
+            index: 20
             isReadonly: true
         }
         Property {
@@ -180,23 +188,7 @@ Module {
             type: "double"
             read: "previewAspect"
             notify: "selectionChanged"
-            index: 20
-            isReadonly: true
-        }
-        Property {
-            name: "outputDirectory"
-            type: "QString"
-            read: "outputDirectory"
-            write: "outputDirectory"
-            notify: "settingsChanged"
             index: 21
-        }
-        Property {
-            name: "originalPreviewUrl"
-            type: "QUrl"
-            read: "originalPreviewUrl"
-            notify: "selectionChanged"
-            index: 22
             isReadonly: true
         }
         Property {
@@ -204,38 +196,46 @@ Module {
             type: "QUrl"
             read: "outputUrl"
             notify: "settingsChanged"
-            index: 23
+            index: 22
             isReadonly: true
+        }
+        Property {
+            name: "outputDirectory"
+            type: "QString"
+            read: "_output_directory"
+            write: "_set_output_directory"
+            notify: "settingsChanged"
+            index: 23
         }
         Property {
             name: "outputScale"
             type: "double"
-            read: "outputScale"
-            write: "outputScale"
+            read: "_output_scale"
+            write: "_set_output_scale"
             notify: "settingsChanged"
             index: 24
         }
         Property {
             name: "tileSize"
             type: "int"
-            read: "tileSize"
-            write: "tileSize"
+            read: "_tile_size"
+            write: "_set_tile_size"
             notify: "settingsChanged"
             index: 25
         }
         Property {
             name: "padding"
             type: "int"
-            read: "padding"
-            write: "padding"
+            read: "_padding"
+            write: "_set_padding"
             notify: "settingsChanged"
             index: 26
         }
         Property {
             name: "darkTheme"
             type: "bool"
-            read: "darkTheme"
-            write: "darkTheme"
+            read: "_dark_theme"
+            write: "_set_dark_theme"
             notify: "settingsChanged"
             index: 27
         }

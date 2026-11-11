@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.engine import MnnRunner, gpu_available, import_mnn
-from src.imaging import upscale_image
-from src.models import DEFAULT_PROFILE, ensure_default_model
+from src.worker.engine import MnnRunner, gpu_available, import_mnn
+from src.core.imaging import upscale_image
+from src.core.models import DEFAULT_PROFILE, ensure_default_model
 
 
 @pytest.mark.skipif(
@@ -19,7 +19,7 @@ def test_default_model_on_gpu(output_scale: float) -> None:
     assert gpu_available(import_mnn()), "The platform's GPU runtime must be available"
     runner = MnnRunner(str(ensure_default_model()), DEFAULT_PROFILE)
     image = Image.new("RGB", (19, 13), (128, 128, 128))
-    progress = []
+    progress: list[tuple[int, int]] = []
     result = upscale_image(
         image,
         runner,

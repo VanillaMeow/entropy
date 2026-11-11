@@ -9,6 +9,7 @@ from xml.etree import ElementTree
 
 import pytest
 from PIL import Image
+from PIL.IcoImagePlugin import IcoImageFile
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QJSEngine
 
@@ -63,26 +64,28 @@ def build_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, P
     return project, binarycreator
 
 
-def fake_deploy(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+def fake_deploy(
+    command: list[str], *, cwd: Path, env: dict[str, str], check: bool
+) -> subprocess.CompletedProcess[str]:
     assert command[0] == "pyside6-deploy"
     assert "--no-install" in command
-    assert kwargs["check"] is True
-    staging = Path(kwargs["cwd"])
+    assert check is True
+    staging = cwd
     config = ConfigParser()
     config.read(command[command.index("--config-file") + 1])
     assert config["nuitka"]["mode"] == "standalone"
-    assert "src/qml/Main.qml" in config["qt"]["qml_files"]
+    assert "src/ui/qml/Main.qml" in config["qt"]["qml_files"]
     assert "--include-package=MNN" in config["nuitka"]["extra_args"]
     assert "--include-distribution-metadata=entropy" in config["nuitka"]["extra_args"]
     assert "--windows-console-mode=attach" in config["nuitka"]["extra_args"]
     assert "--file-version=0.1.0" in config["nuitka"]["extra_args"]
-    native = Path(kwargs["env"]["PYTHONPATH"].split(package_windows.os.pathsep)[0])
+    native = Path(env["PYTHONPATH"].split(package_windows.os.pathsep)[0])
     assert (native / "_mnncengine.pyd").is_file()
     payload = staging / "frozen" / "Entropy.dist"
     payload.mkdir(parents=True)
     (payload / "Entropy.exe").write_bytes(b"standalone application")
     shutil.copy2(native / "_mnncengine.pyd", payload / "_mnncengine.pyd")
-    shutil.copytree(staging / "src" / "qml", payload / "src" / "qml")
+    shutil.copytree(staging / "src" / "ui" / "qml", payload / "src" / "ui" / "qml")
     return subprocess.CompletedProcess(command, 0)
 
 
@@ -93,19 +96,28 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
     license_text = (PROJECT / "LICENSE").read_bytes()
     assert b"Mozilla Public License Version 2.0" in license_text
 
-    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        check: bool = False,
+        timeout: float | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         if command[0] == "pyside6-deploy":
-            return fake_deploy(command, **kwargs)
+            assert cwd is not None and env is not None
+            return fake_deploy(command, cwd=cwd, env=env, check=check)
         if Path(command[0]).name == "Entropy.exe":
             assert Path(command[0]).is_file()
-            assert kwargs["cwd"] == Path(command[0]).parent
-            assert kwargs["env"]["ENTROPY_STARTUP_CHECK"] == "1"
-            assert kwargs["env"]["QT_QPA_PLATFORM"] == "offscreen"
-            assert kwargs["timeout"] == 30
+            assert env is not None
+            assert cwd == Path(command[0]).parent
+            assert env["ENTROPY_STARTUP_CHECK"] == "1"
+            assert env["QT_QPA_PLATFORM"] == "offscreen"
+            assert timeout == 30
             return subprocess.CompletedProcess(command, 0)
         assert command[0] == str(binarycreator)
         assert "--offline-only" in command
-        assert kwargs["check"] is True
+        assert check is True
         config = Path(command[command.index("--config") + 1])
         settings = ElementTree.parse(config).getroot()
         assert settings.findtext("Version") == "0.1.0-alpha.1"
@@ -113,7 +125,7 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         assert settings.findtext("SupportsModify") == "false"
         assert settings.findtext("RunProgram") == "@TargetDir@/app/Entropy.exe"
         with Image.open(config.with_name("Entropy.ico")) as icon:
-            assert icon.format == "ICO"
+            assert isinstance(icon, IcoImageFile)
             assert (16, 16) in icon.ico.sizes() and (256, 256) in icon.ico.sizes()
         packages = Path(command[command.index("--packages") + 1])
         component = packages / package_windows.COMPONENT
@@ -130,7 +142,7 @@ def test_installer_includes_app_model_licenses_and_shortcuts(
         assert (data / "LICENSE").read_bytes() == license_text
         assert (data / "Entropy.exe").read_bytes() == b"standalone application"
         assert (data / "_mnncengine.pyd").read_bytes() == b"GPU runtime"
-        assert (data / "src" / "qml" / "Main.qml").is_file()
+        assert (data / "src" / "ui" / "qml" / "Main.qml").is_file()
         assert (data / "models" / "model.mnn").read_bytes() == b"verified model"
         assert (data / "models" / "model.license.txt").is_file()
         assert (
@@ -180,11 +192,10 @@ def test_missing_standalone_executable_is_rejected(
     build_host: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project, binarycreator = build_host
-    monkeypatch.setattr(
-        package_windows.subprocess,
-        "run",
-        lambda command, **kwargs: subprocess.CompletedProcess(command, 0),
-    )
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(package_windows.subprocess, "run", fake_run)
     with pytest.raises(RuntimeError, match="did not produce the standalone"):
         package_windows.package_windows(project, binarycreator=binarycreator)
 
@@ -194,9 +205,17 @@ def test_failed_startup_does_not_publish_an_installer(
 ) -> None:
     project, binarycreator = build_host
 
-    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        check: bool = False,
+        **_: object,
+    ) -> subprocess.CompletedProcess[str]:
         if command[0] == "pyside6-deploy":
-            return fake_deploy(command, **kwargs)
+            assert cwd is not None and env is not None
+            return fake_deploy(command, cwd=cwd, env=env, check=check)
         assert Path(command[0]).name == "Entropy.exe"
         raise subprocess.CalledProcessError(1, command)
 

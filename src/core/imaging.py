@@ -1,14 +1,26 @@
 """Image loading, padded tiling, and collision-safe PNG output."""
 
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image, ImageOps
 
-from .engine import TileRunner
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
-SUPPORTED_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp"})
+SUPPORTED_SUFFIXES = frozenset({'.png', '.jpg', '.jpeg', '.webp', '.tif', '.tiff', '.bmp'})
+
+type FloatImage = NDArray[np.float32]
+
+
+class TileRunner(Protocol):
+    """Small interface for normalized HWC RGB tile inference."""
+
+    def infer(self, pixels: FloatImage) -> FloatImage:
+        """Upscale a tile with values in [0, 1], returning HWC RGB pixels."""
+        ...
 
 
 def upscale_image(
@@ -33,38 +45,43 @@ def upscale_image(
     """
     final_scale = scale if output_scale is None else output_scale
     if final_scale <= 1:
-        output = image.convert("RGB")
+        output = image.convert('RGB')
         output.info.clear()
         progress(1, 1)
     else:
         if runner is None:
-            raise ValueError("An enhancement model is required for upscaling.")
-        output = _upscale_rgb(image, runner, scale, tile_size, padding, progress)
-    size = tuple(max(1, round(dimension * final_scale)) for dimension in image.size)
+            msg = 'An enhancement model is required for upscaling.'
+            raise ValueError(msg)
+        output = _upscale_rgb(
+            image, runner, scale=scale, tile_size=tile_size, padding=padding, progress=progress
+        )
+    width, height = image.size
+    size = (max(1, round(width * final_scale)), max(1, round(height * final_scale)))
     if output.size != size:
         output = output.resize(size, Image.Resampling.LANCZOS)
     if image.has_transparency_data:
-        alpha = image.convert("RGBA").getchannel("A")
+        alpha = image.convert('RGBA').getchannel('A')
         output.putalpha(alpha.resize(output.size, Image.Resampling.LANCZOS))
     # Non-RGB profiles (for example CMYK JPEG) cannot tag an RGB PNG unchanged.
-    if image.mode in {"RGB", "RGBA", "P"} and "icc_profile" in image.info:
-        output.info["icc_profile"] = image.info["icc_profile"]
+    if image.mode in {'RGB', 'RGBA', 'P'} and 'icc_profile' in image.info:
+        output.info['icc_profile'] = image.info['icc_profile']
     return output
 
 
 def _upscale_rgb(
     image: Image.Image,
     runner: TileRunner,
+    *,
     scale: int,
     tile_size: int,
     padding: int,
     progress: Callable[[int, int], None],
 ) -> Image.Image:
     width, height = image.size
-    output = Image.new("RGB", (width * scale, height * scale))
+    output = Image.new('RGB', (width * scale, height * scale))
     total = ((width + tile_size - 1) // tile_size) * ((height + tile_size - 1) // tile_size)
     completed = 0
-    rgb = image.convert("RGB")
+    rgb = image.convert('RGB')
     for top in range(0, height, tile_size):
         for left in range(0, width, tile_size):
             right, bottom = min(left + tile_size, width), min(top + tile_size, height)
@@ -74,9 +91,8 @@ def _upscale_rgb(
             result = runner.infer(pixels)
             expected = ((y1 - y0) * scale, (x1 - x0) * scale, 3)
             if result.shape != expected or not np.isfinite(result).all():
-                raise ValueError(
-                    f"Invalid tile output: expected finite RGB pixels with shape {expected}."
-                )
+                msg = f'Invalid tile output: expected finite RGB pixels with shape {expected}.'
+                raise ValueError(msg)
             crop = result[
                 (top - y0) * scale : (bottom - y0) * scale,
                 (left - x0) * scale : (right - x0) * scale,
@@ -91,8 +107,9 @@ def _upscale_rgb(
 def load_image(path: Path) -> Image.Image:
     """Load a static image, honoring orientation and retaining its color profile."""
     with Image.open(path) as source:
-        if getattr(source, "n_frames", 1) != 1:
-            raise ValueError("Animated and multipage images are not supported yet.")
+        if getattr(source, 'n_frames', 1) != 1:
+            msg = 'Animated and multipage images are not supported yet.'
+            raise ValueError(msg)
         oriented = ImageOps.exif_transpose(source)
         oriented.load()
         return oriented.copy()
@@ -108,14 +125,14 @@ def save_output(
     """
     created = False
     try:
-        with staging_path.open("xb") as stream:
+        with staging_path.open('xb') as stream:
             created = True
-            image.save(stream, format="PNG", icc_profile=image.info.get("icc_profile"))
-        stem = f"{source.stem}_{scale:g}x"
+            image.save(stream, format='PNG', icc_profile=image.info.get('icc_profile'))
+        stem = f'{source.stem}_{scale:g}x'
         number = 0
         while True:
-            suffix = f"_{number}" if number else ""
-            destination = output_dir / f"{stem}{suffix}.png"
+            suffix = f'_{number}' if number else ''
+            destination = output_dir / f'{stem}{suffix}.png'
             try:
                 destination.hardlink_to(staging_path)
             except FileExistsError:

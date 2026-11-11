@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from src.config import ModelProfile, UpscaleRequest
+from src.core.config import ModelProfile, UpscaleRequest
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,9 @@ def test_request_round_trip(tmp_path: Path) -> None:
 @pytest.mark.parametrize("backend", ["CPU", "Vulkan", "OpenCL", "Metal"])
 def test_request_rejects_backend_selection(tmp_path: Path, backend: str) -> None:
     with pytest.raises(ValidationError):
-        UpscaleRequest(images=(tmp_path / "a.png",), output_dir=tmp_path, backend=backend)
+        UpscaleRequest.model_validate(
+            {"images": [tmp_path / "a.png"], "output_dir": tmp_path, "backend": backend}
+        )
 
 
 @pytest.mark.parametrize("scale", [0, -1, 0.09, 4.01, float("nan"), float("inf")])
