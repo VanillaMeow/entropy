@@ -41,14 +41,11 @@ modules:
         cmake -S . -B pymnn_build -G Ninja
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DCMAKE_CXX_EXTENSIONS=OFF
-        -DMNN_OPENCL=ON -DMNN_VULKAN=OFF
-        -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_SEP_BUILD=OFF
-        -DMNN_BUILD_TRAIN=ON -DMNN_BUILD_CONVERTER=ON -DMNN_BUILD_TORCH=OFF
-        -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON -DMNN_BUILD_AUDIO=ON
-        -DMNN_AAPL_FMWK=OFF
+        -DMNN_BUILD_SHARED_LIBS=OFF -DMNN_OPENCL=ON
+        -DMNN_BUILD_TRAIN=ON -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON -DMNN_BUILD_AUDIO=ON
         -DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,noexecstack
         -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,noexecstack
-      - cmake --build pymnn_build --target MNN MNNTrain MNNConvertDeps --parallel "$FLATPAK_BUILDER_N_JOBS"
+      - cmake --build pymnn_build --target MNN --parallel "$FLATPAK_BUILDER_N_JOBS"
       - >-
         cd pymnn/pip_package && python3 setup.py build_ext --force bdist_wheel
         --deps opencl && uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index
@@ -61,7 +58,9 @@ modules:
         tag: '3.6.2'
         commit: 7e3c6fb5225d3ccf22807ee641332669df34650d
       - type: patch
-        path: mnn-runtime-loaders.patch
+        paths:
+          - ../packaging/mnn/0001-opencl-runtime-soname.patch
+          - ../packaging/mnn/0002-skip-pymnn-tools.patch
 
   # The PySide6 wheels' Qt Network library links against MIT Kerberos.
   - name: krb5

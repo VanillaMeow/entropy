@@ -70,6 +70,8 @@ macOS runtime builds are not enabled yet.
 The runtime is installed in the user's application data directory, separately
 from `.venv`. Normal `uv sync` does not remove it. The app prefers this runtime
 on subsequent worker launches, including after retrying setup from Diagnostics.
+Rebuilding checks that the new runtime imports before switching to it, then
+removes runtimes from earlier builds.
 Changing Python minor versions requires rebuilding for that Python ABI.
 
 ## Default model

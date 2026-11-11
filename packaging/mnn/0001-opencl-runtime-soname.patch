@@ -1,3 +1,8 @@
+Load the OpenCL ICD loader by its runtime SONAME.
+
+Debian and Ubuntu only ship the unversioned libOpenCL.so in their -dev
+packages, so without this MNN finds no OpenCL on a normal desktop install.
+
 --- a/source/backend/opencl/core/runtime/OpenCLWrapper.cpp
 +++ b/source/backend/opencl/core/runtime/OpenCLWrapper.cpp
 @@ -56,6 +56,7 @@

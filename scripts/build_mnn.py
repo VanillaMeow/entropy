@@ -1,7 +1,12 @@
-"""Build and install a per-user MNN 3.6.2 runtime with OpenCL.
+"""Build MNN with OpenCL and install it as a per-user runtime.
 
-Run from the project with ``uv run python scripts/build_mnn.py``. Nothing is
-installed system-wide or into the application's uv-managed site-packages.
+Run from the project root with ``uv run python scripts/build_mnn.py``.
+
+PyPI's MNN wheels are CPU-only, so this builds the Python bindings from a
+pinned source checkout, the same way upstream's
+``pymnn/pip_package/build_deps.py`` does but with every step checked. The
+result is installed into the user's data directory; neither the system nor the
+project's virtual environment is modified.
 """
 
 import argparse
@@ -12,220 +17,240 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from platformdirs import user_cache_path
+from src.paths import cache_dir, runtime_root
 
-from src.paths import runtime_root
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-MNN_VERSION = "3.6.2"
-MNN_COMMIT = "7e3c6fb5225d3ccf22807ee641332669df34650d"
+MNN_VERSION = '3.6.2'
+MNN_COMMIT = '7e3c6fb5225d3ccf22807ee641332669df34650d'
+MNN_REPOSITORY = 'https://github.com/alibaba/MNN.git'
+
+PATCHES = sorted((Path(__file__).resolve().parents[1] / 'packaging' / 'mnn').glob('*.patch'))
+WINDOWS = sys.platform == 'win32'
+NOEXECSTACK = '-Wl,-z,noexecstack'
+
+# Upstream's setup.py still imports distutils, so pin the setuptools that provides it
+WHEEL_BUILD_REQUIREMENTS = ('setuptools==84.2.1', 'wheel==0.48.0', 'numpy>=2.5.4,<3')
+
+CMAKE_OPTIONS = (
+    '-DCMAKE_BUILD_TYPE=Release',
+    # CMake 4 rejects the old minimum versions declared by some bundled projects
+    '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+    # MNN forces __STRICT_ANSI__, which GCC 16 only accepts with GNU extensions off
+    '-DCMAKE_CXX_EXTENSIONS=OFF',
+    '-DMNN_BUILD_SHARED_LIBS=OFF',
+    '-DMNN_OPENCL=ON',
+    # The MNN Python package imports its training, cv and audio modules unconditionally
+    '-DMNN_BUILD_TRAIN=ON',
+    '-DMNN_BUILD_OPENCV=ON',
+    '-DMNN_IMGCODECS=ON',
+    '-DMNN_BUILD_AUDIO=ON',
+)
+
+WINDOWS_CMAKE_OPTIONS = (
+    '-DCMAKE_C_COMPILER=cl',
+    '-DCMAKE_CXX_COMPILER=cl',
+    # Upstream's setup.py compiles the extension with the static /MT runtime
+    '-DMNN_WIN_RUNTIME_MT=ON',
+)
+
+# Hand-written assembly would otherwise mark the extension as needing an
+# executable stack, which current glibc refuses to load
+LINUX_CMAKE_OPTIONS = (
+    f'-DCMAKE_EXE_LINKER_FLAGS={NOEXECSTACK}',
+    f'-DCMAKE_SHARED_LINKER_FLAGS={NOEXECSTACK}',
+)
 
 
-def patch_linux_loaders(source: Path) -> None:
-    """Use runtime SONAMEs, avoiding a dependency on development-package symlinks."""
-    patches = (
-        (
-            "source/backend/opencl/core/runtime/OpenCLWrapper.cpp",
-            "#elif defined(__linux__)\n",
-            '#elif defined(__linux__)\n        "libOpenCL.so.1",\n',
-        ),
+def run(
+    command: Sequence[str | Path], *, cwd: Path | None = None, env: dict[str, str] | None = None
+) -> None:
+    """Echo and run a command, raising if it fails."""
+    arguments = [str(argument) for argument in command]
+    print('+ ' + ' '.join(arguments), flush=True)
+    subprocess.run(arguments, cwd=cwd, env=env, check=True)
+
+
+def succeeds(command: Sequence[str | Path], *, cwd: Path | None = None) -> bool:
+    """Run a command quietly and report whether it exited successfully."""
+    result = subprocess.run(
+        [str(argument) for argument in command], cwd=cwd, capture_output=True, check=False
     )
-    for relative, original, replacement in patches:
-        path = source / relative
-        content = path.read_text(encoding="utf-8")
-        if replacement in content:
-            continue
-        if content.count(original) != 1:
-            raise RuntimeError(f"Unexpected MNN loader source: {relative}")
-        path.write_text(content.replace(original, replacement), encoding="utf-8")
+    return result.returncode == 0
 
 
-def run(command: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
-    """Run a build stage and stop immediately if it fails."""
-    print("+ " + " ".join(command), flush=True)
-    subprocess.run(command, cwd=cwd, env=env, check=True)
-
-
-def main() -> int:
-    """Build a pinned native wheel and activate it after installation succeeds."""
+def parse_args() -> argparse.Namespace:
+    """Parse the command line and stop early if the host cannot build MNN."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--jobs", type=int, default=min(8, os.cpu_count() or 2))
-    parser.add_argument("--source", type=Path, help="Reuse an existing pinned MNN source checkout")
+    parser.add_argument(
+        '--jobs',
+        type=int,
+        default=min(8, os.cpu_count() or 2),
+        help='parallel compile jobs (default: %(default)s)',
+    )
+    parser.add_argument(
+        '--source', type=Path, help='reuse an existing MNN checkout at the pinned commit'
+    )
     args = parser.parse_args()
-    if sys.platform not in {"linux", "win32"}:
-        parser.error("This build helper supports Linux and Windows; macOS is not yet supported.")
-    windows = sys.platform == "win32"
-    if windows and (platform.machine().lower() not in {"amd64", "x86_64"} or sys.maxsize <= 2**32):
-        parser.error("Windows builds require x64 Python and an x64 MSVC toolchain.")
-    if windows and os.environ.get("VSCMD_ARG_TGT_ARCH", "x64").lower() != "x64":
-        parser.error("Run this helper from the x64 Native Tools Command Prompt for Visual Studio.")
+
     if args.jobs < 1:
-        parser.error("--jobs must be positive")
-    for tool in ("uv", "git", "cmake", "ninja"):
-        if shutil.which(tool) is None:
-            parser.error(f"Required build tool is missing: {tool}")
-    if windows:
-        for tool in ("cl", "link", "rc"):
-            if shutil.which(tool) is None:
-                parser.error(
-                    f"Required MSVC/Windows SDK tool is missing: {tool}. Install Visual Studio "
-                    "Build Tools with Desktop development with C++ and a Windows SDK, then run "
-                    "from the x64 Native Tools Command Prompt for Visual Studio."
-                )
-    elif shutil.which("c++") is None:
-        parser.error("Required build tool is missing: c++")
+        parser.error('--jobs must be positive')
+    if sys.platform not in {'linux', 'win32'}:
+        parser.error('Only Linux and Windows are supported; macOS is not yet supported.')
 
-    version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    cache = user_cache_path("placeholder-upscaler", appauthor=False) / f"mnn-{MNN_VERSION}"
-    cache.mkdir(parents=True, exist_ok=True)
-    source = args.source.resolve() if args.source else cache / "source"
+    tools = ['uv', 'git', 'cmake', 'ninja', *(('cl', 'link', 'rc') if WINDOWS else ('c++',))]
+    if missing := [tool for tool in tools if shutil.which(tool) is None]:
+        hint = ''
+        if WINDOWS:
+            hint = (
+                ' Install Visual Studio Build Tools with "Desktop development with C++" and a'
+                ' Windows SDK, then run from the x64 Native Tools Command Prompt.'
+            )
+        parser.error(f'Missing build tools: {", ".join(missing)}.{hint}')
+
+    if WINDOWS:
+        x64_python = platform.machine().lower() in {'amd64', 'x86_64'} and sys.maxsize > 2**32
+        x64_toolchain = os.environ.get('VSCMD_ARG_TGT_ARCH', 'x64').lower() == 'x64'
+        if not (x64_python and x64_toolchain):
+            parser.error(
+                'Windows builds need x64 Python, run from the x64 Native Tools Command Prompt.'
+            )
+    return args
+
+
+def prepare_source(source: Path) -> None:
+    """Clone MNN if needed, check it is the pinned commit, and apply local patches."""
     if not source.exists():
-        run(
-            [
-                "git",
-                "clone",
-                "--branch",
-                MNN_VERSION,
-                "--depth",
-                "1",
-                "https://github.com/alibaba/MNN.git",
-                str(source),
-            ]
-        )
-    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
-    if commit != MNN_COMMIT:
-        raise RuntimeError(f"Unexpected MNN source revision: {commit}; expected {MNN_COMMIT}")
-    if not windows:
-        patch_linux_loaders(source)
+        # Keep LF line endings on Windows so the patches apply
+        clone = ['git', 'clone', '--config', 'core.autocrlf=false', '--depth', '1']
+        run([*clone, '--branch', MNN_VERSION, MNN_REPOSITORY, source])
 
-    # A uv-managed Python includes development headers, unlike many OS installs.
-    run(["uv", "python", "install", version])
-    build_env = cache / f"build-env-{version}"
-    python_path = build_env / "Scripts" / "python.exe" if windows else build_env / "bin" / "python"
-    if not python_path.is_file():
-        run(["uv", "venv", "--python", version, "--managed-python", str(build_env)])
-    python = str(python_path)
-    run(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            python,
-            "setuptools==84.2.1",
-            "wheel==0.48.0",
-            "numpy>=2.5.4,<3",
-        ]
-    )
-    build = source / "pymnn_build"
-    if windows:
-        # Match upstream setup.py's /MT extension and protobuf's static runtime.
-        platform_options = [
-            "-DCMAKE_C_COMPILER=cl",
-            "-DCMAKE_CXX_COMPILER=cl",
-            "-DMNN_WIN_RUNTIME_MT=ON",
-        ]
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
+    if commit != MNN_COMMIT:
+        msg = f'{source} is at {commit}, expected MNN {MNN_VERSION} ({MNN_COMMIT})'
+        raise RuntimeError(msg)
+
+    for patch in PATCHES:
+        if succeeds(['git', 'apply', '--check', patch], cwd=source):
+            run(['git', 'apply', patch], cwd=source)
+        elif not succeeds(['git', 'apply', '--check', '--reverse', patch], cwd=source):
+            msg = f'{patch.name} does not apply to {source}'
+            raise RuntimeError(msg)
+
+
+def build_python(cache: Path) -> Path:
+    """Return a uv-managed Python with the packages upstream's setup.py needs.
+
+    uv-managed Pythons ship development headers, which many OS installs lack,
+    and a separate environment keeps setuptools out of the project's venv.
+    """
+    version = f'{sys.version_info.major}.{sys.version_info.minor}'
+    environment = cache / f'build-env-{version}'
+    python = environment / ('Scripts/python.exe' if WINDOWS else 'bin/python')
+    if not python.is_file():
+        run(['uv', 'venv', '--python', version, '--managed-python', environment])
+    run(['uv', 'pip', 'install', '--python', python, *WHEEL_BUILD_REQUIREMENTS])
+    return python
+
+
+def build_wheel(source: Path, python: Path, jobs: int) -> Path:
+    """Compile static MNN with OpenCL and package the Python bindings as a wheel."""
+    # Upstream's setup.py expects the CMake tree at exactly this path
+    build = source / 'pymnn_build'
+    options = [*CMAKE_OPTIONS, *(WINDOWS_CMAKE_OPTIONS if WINDOWS else LINUX_CMAKE_OPTIONS)]
+    run(['cmake', '-S', source, '-B', build, '-G', 'Ninja', *options])
+    run(['cmake', '--build', build, '--target', 'MNN', '--parallel', str(jobs)])
+
+    package = source / 'pymnn' / 'pip_package'
+    dist = package / 'dist'
+    shutil.rmtree(dist, ignore_errors=True)
+    env = os.environ.copy()
+    if WINDOWS:
+        # Make setuptools use the MSVC environment that CMake used
+        env['DISTUTILS_USE_SDK'] = '1'
     else:
-        platform_options = [
-            "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,noexecstack",
-            "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,noexecstack",
-        ]
-    run(
-        [
-            "cmake",
-            "-S",
-            str(source),
-            "-B",
-            str(build),
-            "-G",
-            "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
-            # MNN forces __STRICT_ANSI__; use strict C++11 consistently with GCC 16.
-            "-DCMAKE_CXX_EXTENSIONS=OFF",
-            "-DMNN_OPENCL=ON",
-            "-DMNN_VULKAN=OFF",
-            "-DMNN_BUILD_SHARED_LIBS=OFF",
-            "-DMNN_SEP_BUILD=OFF",
-            "-DMNN_BUILD_TRAIN=ON",
-            "-DMNN_BUILD_CONVERTER=ON",
-            "-DMNN_BUILD_TORCH=OFF",
-            "-DMNN_BUILD_OPENCV=ON",
-            "-DMNN_IMGCODECS=ON",
-            "-DMNN_BUILD_AUDIO=ON",
-            "-DMNN_AAPL_FMWK=OFF",
-            *platform_options,
-        ]
+        env['LDFLAGS'] = NOEXECSTACK
+    setup = [python, 'setup.py', 'build_ext', '--force', 'bdist_wheel', '--deps', 'opencl']
+    run(setup, cwd=package, env=env)
+
+    wheels = list(dist.glob('mnn_opencl-*.whl'))
+    if len(wheels) != 1:
+        msg = f'Expected one mnn_opencl wheel in {dist}, found {len(wheels)}'
+        raise RuntimeError(msg)
+    return wheels[0]
+
+
+def install_runtime(wheel: Path, root: Path) -> Path:
+    """Install the wheel into a new runtime directory and check that it imports.
+
+    A fresh directory means a running app, which may hold the old extension
+    open on Windows, never sees a half-replaced runtime.
+    """
+    target = root / f'mnn-{MNN_VERSION}-{uuid4().hex[:12]}'
+    install = ['uv', 'pip', 'install', '--python', sys.executable, '--no-deps']
+    run([*install, '--target', target, wheel])
+    smoke_test = (
+        'import sys; sys.path.insert(0, sys.argv[1]); '
+        'import MNN, MNN.expr, MNN.nn; '
+        'assert MNN.__file__.startswith(sys.argv[1]), MNN.__file__'
     )
-    run(
-        [
-            "cmake",
-            "--build",
-            str(build),
-            "--target",
-            "MNN",
-            "MNNTrain",
-            "MNNConvertDeps",
-            "--parallel",
-            str(args.jobs),
-        ]
-    )
-    package = source / "pymnn" / "pip_package"
-    build_settings = os.environ.copy()
-    if windows:
-        # Use the same initialized MSVC environment for CMake and setuptools.
-        build_settings["DISTUTILS_USE_SDK"] = "1"
-    else:
-        build_settings["LDFLAGS"] = "-Wl,-z,noexecstack"
-    run(
-        [python, "setup.py", "build_ext", "--force", "bdist_wheel", "--deps", "opencl"],
-        cwd=package,
-        env=build_settings,
-    )
-    wheels = sorted((package / "dist").glob("mnn_opencl-*.whl"), key=lambda p: p.stat().st_mtime)
-    if not wheels:
-        raise RuntimeError("The MNN build did not produce a GPU-enabled wheel.")
+    run([sys.executable, '-c', smoke_test, target])
+    return target
+
+
+def activate_runtime(root: Path, target: Path) -> None:
+    """Point the app at the new runtime by atomically replacing active.json."""
+    manifest = {
+        'directory': target.name,
+        'version': MNN_VERSION,
+        'source_commit': MNN_COMMIT,
+        'compiled_backends': ['OpenCL'],
+    }
+    temporary = root / f'.active-{uuid4().hex}.json'
+    temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    temporary.replace(root / 'active.json')
+
+
+def remove_stale_runtimes(root: Path, active: Path) -> None:
+    """Delete runtimes from earlier builds, leaving any that are still in use."""
+    for path in root.glob('mnn-*'):
+        if path == active or not path.is_dir():
+            continue
+        try:
+            shutil.rmtree(path)
+        except OSError as exc:
+            print(f'Could not remove old runtime {path}, it will be retried next build: {exc}')
+    for leftover in root.glob('.active-*.json'):
+        leftover.unlink(missing_ok=True)
+
+
+def main() -> None:
+    """Build, install and activate the OpenCL runtime."""
+    args = parse_args()
+    cache = cache_dir() / f'mnn-{MNN_VERSION}'
+    cache.mkdir(parents=True, exist_ok=True)
+    source = args.source.resolve() if args.source else cache / 'source'
+
+    prepare_source(source)
+    python = build_python(cache)
+    wheel = build_wheel(source, python, args.jobs)
 
     root = runtime_root()
     root.mkdir(parents=True, exist_ok=True)
-    target = root / f"mnn-{MNN_VERSION}-{uuid4().hex[:12]}"
-    run(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            sys.executable,
-            "--no-deps",
-            "--target",
-            str(target),
-            str(wheels[-1]),
-        ]
-    )
-    manifest = root / f".active-{uuid4().hex}.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "directory": target.name,
-                "version": MNN_VERSION,
-                "source_commit": MNN_COMMIT,
-                "compiled_backends": ["OpenCL"],
-                "linux_runtime_sonames": not windows,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    manifest.replace(root / "active.json")
-    print(f"GPU-enabled MNN runtime installed in {target}", flush=True)
-    print("Restart the app, or click Retry setup in Diagnostics.", flush=True)
-    return 0
+    target = install_runtime(wheel, root)
+    activate_runtime(root, target)
+    remove_stale_runtimes(root, target)
+
+    print(f'OpenCL MNN runtime installed in {target}')
+    print('Restart the app, or click Retry setup in Diagnostics.')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     try:
-        raise SystemExit(main())
+        main()
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
-        print(f"GPU runtime build failed: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
+        sys.exit(f'GPU runtime build failed: {exc}')

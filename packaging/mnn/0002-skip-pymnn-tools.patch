@@ -1,0 +1,29 @@
+Skip the pymnn converter and quantization extension.
+
+The _tools extension links the model converter and protobuf, which take a
+large share of the build and are not used at runtime. Its console scripts
+are dropped with it.
+
+diff --git a/pymnn/pip_package/setup.py b/pymnn/pip_package/setup.py
+--- a/pymnn/pip_package/setup.py
++++ b/pymnn/pip_package/setup.py
+@@ -406,18 +406,11 @@ def configure_extension_build():
+                     library_dirs=tools_library_dirs,\
+                     extra_link_args=tools_link_args + extra_link_args\
+                         + make_relative_rpath('lib'))
+-    extensions.append(tools)
+     # These extensions are built by cmake and copied manually in build_extensions()
+     # inside the build_ext implementaiton
+ 
+     cmdclass = {}
+-    entry_points = {
+-        'console_scripts': [
+-            'mnnconvert = MNN.tools.mnnconvert:main',
+-            'mnnquant = MNN.tools.mnnquant:main',
+-            'mnn = MNN.tools.mnn:main'
+-        ]
+-    }
++    entry_points = {}
+ 
+     return extensions, cmdclass, packages, entry_points, lib_files
+ 
