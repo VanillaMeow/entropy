@@ -32,7 +32,7 @@ mnn = ["MNN>=3.6.2,<4"]
 dev = [
     "pyright>=1.1.414",
     "pytest>=9.2.0,<10",
-    "ruff>=0.17.4",
+    "ruff>=0.17.5",
 ]
 windows-build = ["Nuitka==4.1.1", "aqtinstall==3.3.0"]
 
@@ -68,7 +68,7 @@ ignore = [
     "DOC",
     "any-type",
     "missing-return-type-special-method",
-    "missing-return-type-undocumented-public-function",
+    "missing-return-type-public-function",
     "missing-return-type-private-function",
 
     # Imports and package structure
