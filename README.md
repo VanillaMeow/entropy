@@ -275,7 +275,6 @@ flatpak install --user entropy-x86_64.flatpak
 
 ```bash
 uv sync --extra mnn
-uv run python scripts/generate_stubs.py
 uv run ruff check
 uv run ruff format --check
 uv run pyright
@@ -286,10 +285,12 @@ uv build
 
 Pyright runs in strict mode over `src`, `scripts` and `tests`. PySide6's bundled
 type stubs miss a few things, such as typed `Property` descriptors, so
-`scripts/generate_stubs.py` mirrors them into `typings/` with targeted patches.
-The mirror is generated, not committed: run the script after `uv sync` and after
-every PySide6 upgrade. `--check` reports a missing or stale mirror. Because of
-this, read/write Qt properties use the explicit form,
+`typings/PySide6` holds patched copies that pyright reads first. Each patch is
+marked with a `# Patched:` comment. A stub there replaces the whole module, and
+the stubs import each other, so the folder holds every module the project imports
+plus everything those modules import in turn. After a PySide6 upgrade, copy the
+new stubs over these and reapply the marked patches. Read/write Qt properties use
+the explicit form,
 `outputScale = Property(float, _get, _set, notify=...)`, since strict pyright
 treats the `@x.setter` pattern as a redeclaration.
 

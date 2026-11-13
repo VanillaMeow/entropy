@@ -71,7 +71,7 @@ def deploy_application(project: Path, staging: Path, native: Path) -> Path:
     """Compile an isolated source tree while making the GPU-enabled MNN importable."""
     shutil.copytree(project / 'src', staging / 'src', ignore=shutil.ignore_patterns('__pycache__'))
     (staging / 'Entropy.py').write_text(
-        '"""Compiled Entropy entry point."""\n\nfrom src import main\n\n'
+        '"""Compiled Entropy entry point."""\n\nfrom src.__main__ import main\n\n'
         'if __name__ == "__main__":\n    raise SystemExit(main())\n',
         encoding='utf-8',
     )

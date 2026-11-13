@@ -37,7 +37,7 @@ dev = [
 windows-build = ["Nuitka==4.1.1", "aqtinstall==3.3.0"]
 
 [project.scripts]
-entropy = "src:main"
+entropy = "src.__main__:main"
 
 [tool.pyright]
 typeCheckingMode = "strict"
@@ -133,8 +133,8 @@ unfixable = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# The launcher defers the GUI and worker imports so each process loads only its own side
-'src/launcher.py' = ['import-outside-top-level']
+# The entry point defers the GUI and worker imports so each process loads only its own side
+'src/__main__.py' = ['import-outside-top-level']
 # Build and check scripts deliberately run developer tools found on PATH
 'scripts/*.py' = ['start-process-with-partial-path']
 

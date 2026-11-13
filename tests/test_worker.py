@@ -8,9 +8,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-import src
+from src import __main__ as entry_point
 from src import application
-from src import worker as worker_package
 from src.core.config import ModelProfile, UpscaleRequest
 from src.core.events import Complete, ImageError, RuntimeReady, Saved, WorkerEvent, decode
 from src.core.imaging import FloatImage
@@ -85,9 +84,9 @@ def test_application_entry_point_dispatches_worker_mode(monkeypatch: pytest.Monk
         pytest.fail("Worker mode must not launch the GUI")
 
     monkeypatch.setattr(sys, "argv", ["Entropy.exe", "--worker", "--probe"])
-    monkeypatch.setattr(worker_package, "main", run_worker)
+    monkeypatch.setattr(worker, "main", run_worker)
     monkeypatch.setattr(application, "run", run_gui)
-    assert src.main() == 7
+    assert entry_point.main() == 7
     assert calls == [["--probe"]]
 
 
