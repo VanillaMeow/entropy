@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Upscaler.Backend
+import Entropy
 import "components"
 
 Rectangle {

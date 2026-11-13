@@ -16,3 +16,5 @@ flatpak-build/
 flatpak-repo/
 *.flatpak
 
+# QML tooling metadata from pyside6-project build
+/Entropy/

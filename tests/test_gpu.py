@@ -12,7 +12,7 @@ from entropy.worker.engine import MnnRunner, gpu_available, import_mnn
 
 
 @pytest.mark.skipif(
-    os.environ.get('UPSCALER_TEST_GPU') != '1', reason='Set UPSCALER_TEST_GPU=1 on a GPU host'
+    os.environ.get('ENTROPY_TEST_GPU') != '1', reason='Set ENTROPY_TEST_GPU=1 on a GPU host'
 )
 @pytest.mark.parametrize('output_scale', [1.5, 2, 3, 4])
 def test_default_model_on_gpu(output_scale: float) -> None:

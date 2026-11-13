@@ -36,6 +36,10 @@ windows-build = ["Nuitka==4.1.1", "aqtinstall==3.3.0"]
 entropy = "entropy.__main__:main"
 app = "entropy.__main__:main"
 
+[tool.pyside6-project]
+# The entry point, the module declaring QML types and one QML file, for QML tooling metadata
+files = ["src/entropy/__main__.py", "src/entropy/ui/controller.py", "src/entropy/ui/qml/Main.qml"]
+
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"

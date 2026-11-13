@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Material
 import QtQuick.Layouts
-import Upscaler.Backend
+import Entropy
 import "components"
 
 Drawer {

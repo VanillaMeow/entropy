@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
-import Upscaler.Backend
+import Entropy
 
 Item {
     id: root

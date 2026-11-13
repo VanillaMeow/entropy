@@ -15,7 +15,7 @@ from entropy.ui.preview import image_aspect
 if TYPE_CHECKING:
     from entropy.application import Entropy
 
-QML_IMPORT_NAME = 'Upscaler.Backend'
+QML_IMPORT_NAME = 'Entropy'
 QML_IMPORT_MAJOR_VERSION = 1
 
 # Shown before any result exists, matching the default 4x model

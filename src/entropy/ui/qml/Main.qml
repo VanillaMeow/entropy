@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import Upscaler.Backend
+import Entropy
 
 ApplicationWindow {
     id: root

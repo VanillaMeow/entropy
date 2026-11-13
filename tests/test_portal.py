@@ -8,8 +8,8 @@ import pytest
 
 
 @pytest.mark.skipif(
-    os.environ.get('UPSCALER_TEST_PORTAL') != '1',
-    reason='Set UPSCALER_TEST_PORTAL=1 in a desktop session',
+    os.environ.get('ENTROPY_TEST_PORTAL') != '1',
+    reason='Set ENTROPY_TEST_PORTAL=1 in a desktop session',
 )
 def test_native_file_and_folder_portal_requests() -> None:
     # Runs in a fresh interpreter, opening each picker in turn while
@@ -31,7 +31,7 @@ monitor = subprocess.Popen([
     "type='method_call',interface='org.freedesktop.portal.FileChooser',member='OpenFile'"
 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 try:
-    with TemporaryDirectory(prefix="upscaler-portal-test-") as directory:
+    with TemporaryDirectory(prefix="entropy-portal-test-") as directory:
         app = QGuiApplication([])
         settings = QSettings(str(Path(directory) / "settings.ini"), QSettings.Format.IniFormat)
         entropy = Entropy(settings=settings, start_setup=False)

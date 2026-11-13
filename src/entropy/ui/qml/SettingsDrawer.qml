@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls.Material
-import Upscaler.Backend
+import Entropy
 
 Drawer {
     id: root

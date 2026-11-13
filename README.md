@@ -278,7 +278,8 @@ uv sync --extra mnn
 uv run ruff check
 uv run ruff format --check
 uv run pyright
-uv run python scripts/check_qml.py --check
+uv run pyside6-project build
+uv run pyside6-qmllint -I . $(find src/entropy/ui/qml -name '*.qml' ! -name Theme.qml)
 uv run pytest -ra
 uv build
 ```
@@ -300,15 +301,21 @@ handling, file collisions, batch errors, Qt startup and process cancellation.
 They do not require network access. Native CPU tests explicitly skip if MNN
 cannot load.
 
-After changing Python properties exposed to QML, regenerate the checked-in
-tooling metadata and lint the components with `uv run python scripts/check_qml.py`.
-Add `--format` to apply `qmlformat`. These optional checks run locally;
-headless UI tests load light/dark themes, the compact layout and drawers.
+The controller registers itself as the `Entropy` QML module at runtime.
+`pyside6-project build` writes matching `qmldir` and `.qmltypes` files to the
+ignored `Entropy/` folder, so qmllint and the QML language server know its
+properties, signals and slots. Rebuild after changing anything the controller
+exposes to QML, then lint. Pass `-I .` to `pyside6-qmlls` for the same view in an
+editor. `Theme.qml` is checked through the components that import it: linted on
+its own, outside its module, it gets a spurious "not declared as singleton"
+warning. Format with
+`uv run pyside6-qmlformat -i -W 100 $(find src/entropy/ui/qml -name '*.qml')`.
+Headless UI tests load light/dark themes, the compact layout and drawers.
 
 To verify actual portal D-Bus requests in a Linux desktop session:
 
 ```bash
-UPSCALER_TEST_PORTAL=1 uv run pytest tests/test_portal.py -v
+ENTROPY_TEST_PORTAL=1 uv run pytest tests/test_portal.py -v
 ```
 
 This test opens and automatically dismisses all three native pickers. It checks
@@ -317,7 +324,7 @@ that each action sends exactly one portal request and needs `dbus-monitor`.
 Run the real default model with OpenCL acceleration:
 
 ```bash
-UPSCALER_TEST_GPU=1 uv run pytest tests/test_gpu.py -v
+ENTROPY_TEST_GPU=1 uv run pytest tests/test_gpu.py -v
 ```
 
 These tests require the GPU runtime and drivers, and install the pinned model if
