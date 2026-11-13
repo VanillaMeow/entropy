@@ -279,7 +279,7 @@ uv run ruff check
 uv run ruff format --check
 uv run pyright
 uv run pyside6-project build
-uv run pyside6-qmllint -I . $(find src/entropy/ui/qml -name '*.qml' ! -name Theme.qml)
+uv run pyside6-qmllint -I . $(find "$PWD/src/entropy/ui/qml" -name '*.qml')
 uv run pytest -ra
 uv build
 ```
@@ -306,9 +306,9 @@ The controller registers itself as the `Entropy` QML module at runtime.
 ignored `Entropy/` folder, so qmllint and the QML language server know its
 properties, signals and slots. Rebuild after changing anything the controller
 exposes to QML, then lint. Pass `-I .` to `pyside6-qmlls` for the same view in an
-editor. `Theme.qml` is checked through the components that import it: linted on
-its own, outside its module, it gets a spurious "not declared as singleton"
-warning. Format with
+editor. qmllint gets absolute paths because with relative ones it fails to match
+`Theme.qml` to its `qmldir` entry and wrongly warns that the singleton is
+undeclared. Format with
 `uv run pyside6-qmlformat -i -W 100 $(find src/entropy/ui/qml -name '*.qml')`.
 Headless UI tests load light/dark themes, the compact layout and drawers.
 
