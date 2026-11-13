@@ -1,5 +1,7 @@
 """Validated settings shared by the desktop UI and inference process."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Literal, Self
 from uuid import UUID, uuid4

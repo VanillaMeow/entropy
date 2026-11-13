@@ -1,5 +1,7 @@
 """Image loading, padded tiling, and collision-safe PNG output."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Protocol
 
 import numpy as np

@@ -1,5 +1,7 @@
 """The image queue, exposed to Qt Quick as a native list model."""
 
+from __future__ import annotations
+
 import base64
 from dataclasses import dataclass
 from enum import StrEnum

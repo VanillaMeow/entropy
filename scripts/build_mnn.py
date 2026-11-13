@@ -9,6 +9,8 @@ result is installed into the user's data directory; neither the system nor the
 project's virtual environment is modified.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

@@ -1,5 +1,7 @@
 """Configure Qt's native Linux dialogs to use xdg-desktop-portal."""
 
+from __future__ import annotations
+
 import logging
 import os
 import sys

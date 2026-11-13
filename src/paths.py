@@ -1,5 +1,7 @@
 """Per-user storage shared by the GUI, workers, and native build helper."""
 
+from __future__ import annotations
+
 import platform
 import sys
 from typing import TYPE_CHECKING

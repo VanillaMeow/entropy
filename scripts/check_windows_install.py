@@ -1,5 +1,7 @@
 """Check GUI worker startup and uninstall confirmation on a clean Windows build host."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

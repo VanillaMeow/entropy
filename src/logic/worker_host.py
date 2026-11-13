@@ -1,5 +1,7 @@
 """Run the inference worker as a child process and relay its typed events."""
 
+from __future__ import annotations
+
 import sys
 from typing import TYPE_CHECKING, Literal
 

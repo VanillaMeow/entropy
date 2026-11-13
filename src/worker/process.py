@@ -4,6 +4,8 @@ MNN may log to stdout and a faulty GPU driver can crash native code. Keeping it
 outside Qt's process preserves UI responsiveness and allows immediate cancel.
 """
 
+from __future__ import annotations
+
 import logging
 import sys
 import warnings

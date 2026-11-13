@@ -1,5 +1,7 @@
 """Install the pinned default enhancement model automatically and verify its bytes."""
 
+from __future__ import annotations
+
 import hashlib
 import os
 import sys

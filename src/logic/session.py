@@ -1,5 +1,7 @@
 """Queue, batch and setup state for one desktop session, independent of the UI."""
 
+from __future__ import annotations
+
 import math
 import time
 from pathlib import Path

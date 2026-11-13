@@ -1,5 +1,7 @@
 """Build a standalone Windows app with pyside6-deploy and an offline Qt IFW installer."""
 
+from __future__ import annotations
+
 import argparse
 import os
 import platform

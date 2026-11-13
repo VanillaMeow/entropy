@@ -5,6 +5,8 @@ logs to the same stream, so each event line starts with ``EVENT_PREFIX`` and
 the desktop process treats every other line as diagnostic output.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Annotated, Literal
 

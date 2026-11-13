@@ -1,5 +1,7 @@
 """Application version shared by the interface and release packaging."""
 
+from __future__ import annotations
+
 import re
 from importlib.metadata import version
 

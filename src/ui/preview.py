@@ -1,5 +1,7 @@
 """Bounded, EXIF-oriented previews decoded by Qt Quick's image worker thread."""
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, override
 

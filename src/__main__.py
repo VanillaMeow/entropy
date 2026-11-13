@@ -1,5 +1,7 @@
 """Start the desktop application or, with ``--worker``, its inference process."""
 
+from __future__ import annotations
+
 import sys
 
 

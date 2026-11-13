@@ -1,5 +1,7 @@
 """Discover the locally built GPU runtime without modifying the uv environment."""
 
+from __future__ import annotations
+
 import json
 import sys
 from importlib import invalidate_caches

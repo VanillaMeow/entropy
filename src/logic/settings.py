@@ -1,5 +1,7 @@
 """Typed access to persisted user preferences."""
 
+from __future__ import annotations
+
 import math
 
 from PySide6.QtCore import QSettings

@@ -1,5 +1,7 @@
 """Generate Python QML type metadata and lint the Qt Quick component tree."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import subprocess

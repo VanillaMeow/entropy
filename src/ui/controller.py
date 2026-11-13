@@ -1,5 +1,7 @@
 """The QML view model: a thin, typed face over the session for Qt Quick."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
