@@ -20,7 +20,12 @@ QML_IMPORT_MAJOR_VERSION = 1
 
 # Shown before any result exists, matching the default 4x model
 DEFAULT_RESULT_SCALE = 4.0
+
+# A typical photo shape, used while nothing is selected
 DEFAULT_ASPECT = 1.5
+
+# Matches the floor the application applies to the system font
+MIN_FONT_SIZE = 12
 
 
 @QmlElement
@@ -40,11 +45,15 @@ class AppController(QObject):
     def __init__(self, app: Entropy) -> None:
         super().__init__()
         self.app = app
+
+        # Forward the session's signals, they drive every binding below
         session = app.session
         session.stateChanged.connect(self.stateChanged)
         session.settingsChanged.connect(self.settingsChanged)
         session.selectionChanged.connect(self.selectionChanged)
         session.diagnosticsChanged.connect(self.diagnosticsChanged)
+
+        # Follow the desktop's color scheme until the user picks a theme
         default_dark = QGuiApplication.styleHints().colorScheme() != Qt.ColorScheme.Light
         self._dark = app.settings.get('darkTheme', default_dark)
 
@@ -108,7 +117,7 @@ class AppController(QObject):
 
     @Property(float, constant=True)
     def bodyFontSize(self) -> float:
-        return max(12, QGuiApplication.font().pointSizeF())
+        return max(MIN_FONT_SIZE, QGuiApplication.font().pointSizeF())
 
     # Selection
 
@@ -211,11 +220,13 @@ class AppController(QObject):
     @Slot('QVariantList')
     def addUrls(self, urls: list[QUrl | str]) -> None:
         """Accept local file and folder URLs from native dialogs or drag and drop."""
+        # Drag and drop hands over strings, dialogs hand over QUrl objects
         paths: list[Path] = []
         for value in urls:
             url = value if isinstance(value, QUrl) else QUrl(value)
             if url.isLocalFile():
                 paths.append(Path(url.toLocalFile()))
+
         self.app.session.add_paths(paths)
 
     @Slot()
@@ -253,6 +264,7 @@ class AppController(QObject):
     def openOutput(self) -> None:
         """Reveal the output directory in the desktop file manager."""
         path = self.app.session.output_path
+
         if not path.is_dir():
             self.app.session.report_error(self.tr('The output folder has not been created yet.'))
         elif not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):

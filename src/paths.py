@@ -31,6 +31,8 @@ def cache_dir() -> Path:
 
 
 def runtime_root() -> Path:
-    """Keep native runtime installations separate for each Python ABI/platform."""
-    tag = f'cp{sys.version_info.major}{sys.version_info.minor}-{sys.platform}-{platform.machine()}'
+    """Keep native runtime installations separate for each Python ABI and platform."""
+    python = f'cp{sys.version_info.major}{sys.version_info.minor}'
+    tag = f'{python}-{sys.platform}-{platform.machine()}'
+
     return data_dir() / 'runtimes' / tag

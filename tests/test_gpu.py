@@ -6,20 +6,22 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.worker.engine import MnnRunner, gpu_available, import_mnn
 from src.core.imaging import upscale_image
 from src.core.models import DEFAULT_PROFILE, ensure_default_model
+from src.worker.engine import MnnRunner, gpu_available, import_mnn
 
 
 @pytest.mark.skipif(
-    os.environ.get("UPSCALER_TEST_GPU") != "1", reason="Set UPSCALER_TEST_GPU=1 on a GPU host"
+    os.environ.get('UPSCALER_TEST_GPU') != '1', reason='Set UPSCALER_TEST_GPU=1 on a GPU host'
 )
-@pytest.mark.parametrize("output_scale", [1.5, 2, 3, 4])
+@pytest.mark.parametrize('output_scale', [1.5, 2, 3, 4])
 def test_default_model_on_gpu(output_scale: float) -> None:
     assert gpu_available(import_mnn()), "The platform's GPU runtime must be available"
     runner = MnnRunner(str(ensure_default_model()), DEFAULT_PROFILE)
-    image = Image.new("RGB", (19, 13), (128, 128, 128))
+
+    image = Image.new('RGB', (19, 13), (128, 128, 128))
     progress: list[tuple[int, int]] = []
+
     result = upscale_image(
         image,
         runner,
@@ -29,8 +31,11 @@ def test_default_model_on_gpu(output_scale: float) -> None:
         padding=16,
         progress=lambda done, total: progress.append((done, total)),
     )
+
+    # 19x13 in 16px tiles is two tiles wide and one tall
     assert result.size == (round(19 * output_scale), round(13 * output_scale))
     assert progress[-1] == (2, 2)
+
+    # A flat mid-gray image must stay near mid-gray, including edge tiles
     pixels = np.asarray(result)
-    # A flat mid-gray image must stay near mid-gray, including edge tiles.
     assert np.abs(pixels.astype(np.float32) - 128).max() < 20

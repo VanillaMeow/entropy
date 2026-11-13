@@ -23,17 +23,24 @@ class Settings:
         value: object = self.store.value(key)
         if value is None:
             return default
+
+        # Every backend can round-trip through text, so convert from that
         text = str(value).strip()
+
+        # Bool is checked before int because bool is a subclass of int
         try:
             if isinstance(default, bool):
                 return {'true': True, 'false': False}[text.lower()]
+
             if isinstance(default, int):
                 return int(text)
+
             if isinstance(default, float):
                 number = float(text)
                 return number if math.isfinite(number) else default
         except KeyError, ValueError:
             return default
+
         return text
 
     def set(self, key: str, value: bool | float | str) -> None:

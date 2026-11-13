@@ -53,6 +53,8 @@ def preview_url(path: Path | None) -> QUrl:
     """Encode a local path as an unambiguous image-provider URL."""
     if path is None:
         return QUrl()
+
+    # Base64 keeps slashes, spaces and non-ASCII names intact inside the URL
     token = base64.urlsafe_b64encode(str(path).encode()).decode('ascii')
     return QUrl(f'image://{PREVIEW_PROVIDER}/{token}')
 
@@ -67,6 +69,7 @@ class ImageQueue(QAbstractListModel):
 
     changed = Signal()
 
+    # QML reads each entry through these role names, in this order
     _NAMES: ClassVar = ('fileName', 'sourceUrl', 'outputUrl', 'state', 'errorText', 'previewUrl')
     _ROLES: ClassVar = {
         Qt.ItemDataRole.UserRole + offset: QByteArray(name.encode())
@@ -82,8 +85,11 @@ class ImageQueue(QAbstractListModel):
 
     count = Property(int, _count, notify=changed)
 
+    # Qt model interface
+
     @override
     def rowCount(self, parent: ModelIndex | None = None) -> int:
+        # A flat list, so only the invisible root has rows
         return 0 if parent is not None and parent.isValid() else len(self.entries)
 
     @override
@@ -94,6 +100,8 @@ class ImageQueue(QAbstractListModel):
     def data(self, index: ModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> object:
         if not index.isValid() or not 0 <= index.row() < len(self.entries):
             return None
+
+        # Ordered to match _NAMES, so a role maps straight to its position
         entry = self.entries[index.row()]
         values = (
             entry.path.name,
@@ -103,8 +111,11 @@ class ImageQueue(QAbstractListModel):
             entry.error,
             preview_url(entry.path),
         )
+
         offset = role - Qt.ItemDataRole.UserRole
         return values[offset] if 0 <= offset < len(values) else None
+
+    # Queue editing
 
     def append(self, paths: list[Path]) -> None:
         """Insert unique file paths while retaining the existing order."""
@@ -114,8 +125,10 @@ class ImageQueue(QAbstractListModel):
             if path not in existing:
                 additions.append(QueueEntry(path))
                 existing.add(path)
+
         if not additions:
             return
+
         first = len(self.entries)
         self.beginInsertRows(QModelIndex(), first, first + len(additions) - 1)
         self.entries.extend(additions)
@@ -147,7 +160,10 @@ class ImageQueue(QAbstractListModel):
     ) -> None:
         """Publish processing changes for exactly one delegate."""
         entry = self.entries[row]
-        entry.state, entry.output, entry.error = state, output, error
+        entry.state = state
+        entry.output = output
         entry.output_scale = output_scale
+        entry.error = error
+
         index = self.index(row)
         self.dataChanged.emit(index, index, list(self._ROLES))

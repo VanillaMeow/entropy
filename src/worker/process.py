@@ -49,18 +49,23 @@ def emit(event: WorkerEvent) -> None:
 def run_batch(request: UpscaleRequest) -> int:
     """Process a batch sequentially and report individual failures honestly."""
     request.output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Downscaling and plain resizing never need the model, so only load it to enlarge
     runner = None
     if request.output_scale > 1:
         model_path = request.model_path or prepare_model()
         if not model_path.is_file() or model_path.suffix.lower() != '.mnn':
             msg = 'The enhancement model is missing. Retry model installation.'
             raise ValueError(msg)
+
         emit(Status(message='Preparing enhancement…'))
         runner = MnnRunner(str(model_path), request.profile)
 
     failed = 0
     for index, path in enumerate(request.images):
         emit(Started(index=index, source=path))
+
+        # One bad image must not stop the batch, so it is reported and skipped
         try:
             image = load_image(path)
             result = upscale_image(
@@ -76,7 +81,6 @@ def run_batch(request: UpscaleRequest) -> int:
                 result, path, request.output_dir, request.output_scale, request.staging_path
             )
         except Exception as exc:
-            # This is a process boundary: keep the batch running but mark failures
             logger.exception('Failed to upscale %s', path)
             failed += 1
             emit(ImageError(index=index, message=str(exc)))
@@ -89,6 +93,7 @@ def run_batch(request: UpscaleRequest) -> int:
                     output_scale=request.output_scale,
                 )
             )
+
     emit(Complete(succeeded=len(request.images) - failed, failed=failed))
     return 1 if failed else 0
 
@@ -99,6 +104,7 @@ def prepare_model() -> Path:
         progress=lambda done, total: emit(ModelDownload(done=done, total=total))
     )
     emit(ModelReady())
+
     return path
 
 
@@ -118,24 +124,32 @@ def run(arguments: list[str]) -> int:
         case ['--probe']:
             probe_runtime()
             return 0
+
         case ['--prepare']:
             prepare_model()
             probe_runtime()
             return 0
+
+        # The request arrives on stdin, which has no length limit unlike argv
         case ['--job']:
             return run_batch(UpscaleRequest.model_validate_json(sys.stdin.buffer.read()))
+
         case _:
             raise ValueError(USAGE)
 
 
 def main() -> int:
     """Run the mode named on the command line, reporting any failure as an event."""
+    # Logs go to stderr so stdout carries only events and MNN's own output
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+
+    # Refuse decompression bombs outright instead of only warning about them
     warnings.simplefilter('error', Image.DecompressionBombWarning)
+
+    # This is the process boundary, so the desktop app must hear of every failure
     try:
         return run(sys.argv[1:])
     except Exception as exc:
-        # This is a process boundary: the desktop app learns of every failure
         logger.exception('Worker failed')
         emit(Error(message=str(exc)))
         return 1

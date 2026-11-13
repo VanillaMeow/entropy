@@ -18,6 +18,7 @@ from src.ui.dialogs import configure_file_portal
 from src.ui.view import Ui
 from src.version import application_version
 
+# Some desktops default to fonts too small for the dense queue layout
 MIN_FONT_SIZE = 12
 
 
@@ -30,10 +31,13 @@ class Entropy:
     """
 
     def __init__(self, *, settings: QSettings | None = None, start_setup: bool = True) -> None:
+        # Order matters, each part may use the ones above it
         self.settings = Settings(settings)
         self.worker = WorkerHost()
         self.session = Session(self)
         self.ui = Ui(self)
+
+        # Start setup once the event loop runs, so the window appears first
         if start_setup:
             QTimer.singleShot(0, self.session.prepare)
 
@@ -46,15 +50,20 @@ class Entropy:
 
 def run() -> int:
     """Launch Material Qt Quick with native portal file dialogs on Linux."""
+    # Both must be configured before the QGuiApplication exists
     configure_file_portal()
     QQuickStyle.setStyle('Material')
+
     qt = QGuiApplication(sys.argv)
     qt.setOrganizationName('Entropy')
     qt.setApplicationName('Entropy')
     qt.setApplicationDisplayName('Entropy')
     qt.setApplicationVersion(application_version())
+
+    # The compiled build ships its icon next to the executable
     if is_compiled():
         qt.setWindowIcon(QIcon(str(Path(sys.executable).with_name('Entropy.ico'))))
+
     font = qt.font()
     font.setPointSizeF(max(MIN_FONT_SIZE, font.pointSizeF()))
     qt.setFont(font)
@@ -63,13 +72,17 @@ def run() -> int:
     startup_check = os.environ.get('ENTROPY_STARTUP_CHECK') == '1'
     app = Entropy(start_setup=not startup_check)
     engine = app.ui.load()
+
+    # No root object means the QML failed to load, the errors are already logged
     if not engine.rootObjects():
         app.shutdown()
         return 1
+
     if startup_check:
         for window in engine.rootObjects():
             if isinstance(window, QWindow):
                 window.close()
         return 0
+
     qt.aboutToQuit.connect(app.shutdown)
     return qt.exec()

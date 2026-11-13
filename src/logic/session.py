@@ -30,9 +30,16 @@ from src.logic.image_queue import EntryState, ImageQueue, QueueEntry
 if TYPE_CHECKING:
     from src.application import Entropy
 
+# Limits on preferences, which mirror the choices the interface offers
 TILE_SIZES = frozenset({32, 64, 128, 256, 512})
 MIN_SCALE, MAX_SCALE = 0.1, 4.0
 MAX_PADDING = 128
+
+# Defaults for a first launch or for a stored value that is out of range
+DEFAULT_TILE_SIZE = 128
+DEFAULT_PADDING = 16
+
+# Enough history to diagnose a failure without the log growing forever
 MAX_LOG_LINES = 500
 
 
@@ -52,35 +59,58 @@ class Session(QObject):
     def __init__(self, app: Entropy) -> None:
         super().__init__()
         self.app = app
+
         self.queue = ImageQueue(self)
         self.queue.changed.connect(self.stateChanged)
+
         app.worker.received.connect(self.handle_event)
         app.worker.diagnostic.connect(self.log)
         app.worker.finished.connect(self.handle_finished)
 
+        # Setup and batch progress
         self.request: UpscaleRequest | None = None
         self.preparing = False
         self.model_ready = False
         self.runtime_ready = False
-        self.selected = -1
         self.progress = 0.0
         self.indeterminate = False
+        self._start_time = 0.0
+
+        # Tells a clean exit apart from a worker that died without saying why
+        self._terminal_event = False
+
+        # What the interface shows
+        self.selected = -1
         self.has_error = False
         self.status = self.tr('Ready when you are')
         self.model_status = self.tr('Installs automatically · 4.9 MB')
         self.logs: list[str] = []
-        self._terminal_event = False
-        self._start_time = 0.0
 
-        settings = app.settings
+        self._load_settings()
+
+    def _load_settings(self) -> None:
+        """Restore preferences, replacing anything out of range with its default."""
+        settings = self.app.settings
+
         pictures = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation)
         self._output = settings.get('output', str(Path(pictures or Path.home()) / 'Upscaled'))
-        tile = settings.get('tileSize', 128)
-        self._tile = tile if tile in TILE_SIZES else 128
-        padding = settings.get('padding', 16)
-        self._padding = padding if 0 <= padding <= MAX_PADDING else 16
+
+        tile = settings.get('tileSize', DEFAULT_TILE_SIZE)
+        self._tile = tile if tile in TILE_SIZES else DEFAULT_TILE_SIZE
+
+        padding = settings.get('padding', DEFAULT_PADDING)
+        self._padding = padding if 0 <= padding <= MAX_PADDING else DEFAULT_PADDING
+
         scale = settings.get('outputScale', MAX_SCALE)
         self._output_scale = scale if MIN_SCALE <= scale <= MAX_SCALE else MAX_SCALE
+
+    def save_settings(self) -> None:
+        """Persist the user's preferences."""
+        settings = self.app.settings
+        settings.set('output', self._output)
+        settings.set('tileSize', self._tile)
+        settings.set('padding', self._padding)
+        settings.set('outputScale', self._output_scale)
 
     # Derived state
 
@@ -114,7 +144,7 @@ class Session(QObject):
         """The output folder as an absolute path."""
         return Path(self._output).expanduser().resolve()
 
-    # Preferences
+    # Preferences, which ignore invalid values and changes while a batch runs
 
     @property
     def output_directory(self) -> str:
@@ -163,14 +193,6 @@ class Session(QObject):
             self._padding = value
             self.settingsChanged.emit()
 
-    def save_settings(self) -> None:
-        """Persist the user's preferences."""
-        settings = self.app.settings
-        settings.set('output', self._output)
-        settings.set('tileSize', self._tile)
-        settings.set('padding', self._padding)
-        settings.set('outputScale', self._output_scale)
-
     # Queue
 
     def select(self, row: int) -> None:
@@ -183,24 +205,28 @@ class Session(QObject):
         """Expand folders non-recursively and append supported images."""
         if not self.can_edit:
             return
+
         try:
             candidates = [
                 child.expanduser().resolve()
                 for path in paths
                 for child in (sorted(path.iterdir()) if path.is_dir() else [path])
             ]
-            self.queue.append(
-                [
-                    path
-                    for path in candidates
-                    if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
-                ]
-            )
+            images = [
+                path
+                for path in candidates
+                if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
+            ]
         except OSError as exc:
             self.report_error(self.tr('Could not add images: {error}').format(error=exc))
             return
+
+        self.queue.append(images)
+
+        # Show the first image straight away so the comparison view is not empty
         if self.selected < 0 and self.queue.count:
             self.select(0)
+
         self.status = (
             self.tr('1 image ready')
             if self.queue.count == 1
@@ -213,9 +239,13 @@ class Session(QObject):
         """Remove the selected image without deleting its files."""
         if not self.can_edit or self.selected < 0:
             return
+
+        # Deselect first so nothing reads the row while it is being removed
         row = self.selected
         self.selected = -1
         self.queue.remove(row)
+
+        # Move to the next image, or the new last one if the last was removed
         self.select(min(row, self.queue.count - 1))
         self.selectionChanged.emit()
 
@@ -226,16 +256,18 @@ class Session(QObject):
             self.queue.clear()
             self.selectionChanged.emit()
 
-    # Worker
+    # Worker runs
 
     def prepare(self) -> None:
         """Install the default model and probe GPU support in the worker."""
         if self.busy:
             return
+
         self.preparing = True
         self._terminal_event = False
         self.has_error = False
         self.status = self.tr('Preparing your workspace…')
+
         self.app.worker.start('prepare')
         self.stateChanged.emit()
 
@@ -243,6 +275,8 @@ class Session(QObject):
         """Snapshot the queue and preferences, then start the worker on them."""
         if not self.can_start:
             return
+
+        # Resolving the output folder or validating the request can still fail here
         try:
             request = UpscaleRequest(
                 images=tuple(entry.path for entry in self.queue.entries),
@@ -255,20 +289,26 @@ class Session(QObject):
         except (OSError, ValueError) as exc:
             self.report_error(str(exc))
             return
+
         self.request = request
         self.preparing = False
         self._terminal_event = False
         self.has_error = False
+
         for row in range(self.queue.count):
             self.queue.update_entry(row, state=EntryState.QUEUED)
         self.selectionChanged.emit()
-        self.progress, self.indeterminate = 0.0, True
+
+        # Indeterminate until the first tile reports, loading the model takes a moment
+        self.progress = 0.0
+        self.indeterminate = True
         self.status = (
             self.tr('Resizing images…')
             if request.output_scale <= 1
             else self.tr('Warming up the GPU…')
         )
         self._start_time = time.monotonic()
+
         self.app.worker.start('job', request)
         self.stateChanged.emit()
 
@@ -288,56 +328,75 @@ class Session(QObject):
                 self.status = self.tr(
                     'Installing your enhancement model. This only downloads once.'
                 )
+
             case ModelReady():
                 self.model_ready = True
                 self.model_status = self.tr('Ready for offline use')
+
             case RuntimeReady(available=available, runtime_path=runtime_path):
-                self._terminal_event = True
-                self.runtime_ready = available
-                self.log(f'GPU runtime: {"ready" if available else "unavailable"}')
-                if available:
-                    self.status = self.tr('Ready when you are')
-                else:
-                    self._set_error(self.tr('GPU setup is required. Open diagnostics for details.'))
-                    self.log('Build the GPU runtime: uv run python scripts/build_mnn.py')
-                if runtime_path:
-                    self.log(f'MNN runtime: {runtime_path}')
+                self._apply_runtime(available, runtime_path)
+
             case Status(message=message):
                 self.status = message
+
             case Started(index=index, source=source):
                 self.queue.update_entry(index, state=EntryState.PROCESSING)
                 self.status = self.tr('Processing {name}…').format(name=source.name)
+
             case Progress(index=index, done=done, total=total) if self.request:
                 self._show_progress(index, done, total, len(self.request.images))
+
             case Saved(index=index, output=output, output_scale=output_scale):
                 self.queue.update_entry(
                     index, state=EntryState.DONE, output=output, output_scale=output_scale
                 )
                 self.log(f'Saved: {output}')
                 self.selectionChanged.emit()
+
             case ImageError(index=index, message=message):
                 self.queue.update_entry(index, state=EntryState.FAILED, error=message)
                 self.log(message)
+
             case Error(message=message):
                 self._terminal_event = True
                 self._set_error(message)
                 if self.preparing:
                     self.runtime_ready = False
+
             case Complete(succeeded=succeeded, failed=failed):
                 self._terminal_event = True
-                self.progress, self.indeterminate = 1.0, False
+                self.progress = 1.0
+                self.indeterminate = False
                 self.has_error = failed > 0
                 self.status = self.tr('Finished · {saved} saved · {failed} failed').format(
                     saved=succeeded, failed=failed
                 )
+
             case Progress():
                 # Progress without a batch belongs to a run that already finished
                 pass
+
         self.stateChanged.emit()
+
+    def _apply_runtime(self, available: bool, runtime_path: str | None) -> None:
+        """Record the GPU probe result, which ends a setup run."""
+        self._terminal_event = True
+        self.runtime_ready = available
+        self.log(f'GPU runtime: {"ready" if available else "unavailable"}')
+
+        if available:
+            self.status = self.tr('Ready when you are')
+        else:
+            self._set_error(self.tr('GPU setup is required. Open diagnostics for details.'))
+            self.log('Build the GPU runtime: uv run python scripts/build_mnn.py')
+
+        if runtime_path:
+            self.log(f'MNN runtime: {runtime_path}')
 
     def handle_finished(self, code: int, cancelled: bool) -> None:
         """Settle the queue and clean up after the worker exits."""
         self.indeterminate = False
+
         if cancelled:
             self.status = (
                 self.tr('Setup cancelled. Retry when you’re ready.')
@@ -347,19 +406,27 @@ class Session(QObject):
         elif not self._terminal_event:
             self._set_error(self.tr('The worker stopped unexpectedly. See diagnostics.'))
             self.log(f'Worker exit code: {code}')
+
         if self.request:
-            unfinished = EntryState.CANCELLED if cancelled else EntryState.NOT_COMPLETED
-            for row, entry in enumerate(self.queue.entries):
-                if entry.state in {EntryState.QUEUED, EntryState.PROCESSING}:
-                    self.queue.update_entry(row, state=unfinished)
-            try:
-                self.request.staging_path.unlink(missing_ok=True)
-            except OSError as exc:
-                self.log(f'Could not remove scratch output: {exc}')
+            self._settle_batch(self.request, cancelled=cancelled)
+
         self.request = None
         self.preparing = False
         self.selectionChanged.emit()
         self.stateChanged.emit()
+
+    def _settle_batch(self, request: UpscaleRequest, *, cancelled: bool) -> None:
+        """Mark images the worker never finished and remove its scratch file."""
+        unfinished = EntryState.CANCELLED if cancelled else EntryState.NOT_COMPLETED
+        for row, entry in enumerate(self.queue.entries):
+            if entry.state in {EntryState.QUEUED, EntryState.PROCESSING}:
+                self.queue.update_entry(row, state=unfinished)
+
+        # A killed worker cannot clean up after itself
+        try:
+            request.staging_path.unlink(missing_ok=True)
+        except OSError as exc:
+            self.log(f'Could not remove scratch output: {exc}')
 
     # Messages
 
@@ -375,14 +442,19 @@ class Session(QObject):
         self.diagnosticsChanged.emit()
 
     def _set_error(self, message: str) -> None:
-        self.status, self.has_error = message, True
+        self.status = message
+        self.has_error = True
         self.log(message)
 
     def _show_progress(self, index: int, done: int, total: int, images: int) -> None:
+        """Turn tile progress into overall progress and a time estimate."""
         self.indeterminate = False
         self.progress = (index + done / total) / images
+
+        # Assume the rest of the batch runs at the average speed so far
         elapsed = time.monotonic() - self._start_time
         remaining = elapsed * (1 - self.progress) / self.progress
+
         self.status = self.tr(
             'Image {current} of {total} · about {seconds} seconds remaining'
         ).format(current=index + 1, total=images, seconds=max(1, round(remaining)))

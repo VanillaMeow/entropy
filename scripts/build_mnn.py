@@ -38,25 +38,26 @@ NOEXECSTACK = '-Wl,-z,noexecstack'
 # Upstream's setup.py still imports distutils, so pin the setuptools that provides it
 WHEEL_BUILD_REQUIREMENTS = ('setuptools==84.2.1', 'wheel==0.48.0', 'numpy>=2.5.4,<3')
 
+# Why some options are needed:
+#   CMAKE_POLICY_VERSION_MINIMUM: CMake 4 rejects old minimums in bundled projects
+#   CMAKE_CXX_EXTENSIONS: MNN forces __STRICT_ANSI__, which GCC 16 needs this off for
+#   MNN_BUILD_TRAIN, OPENCV, IMGCODECS, AUDIO: the Python package imports them all
 CMAKE_OPTIONS = (
     '-DCMAKE_BUILD_TYPE=Release',
-    # CMake 4 rejects the old minimum versions declared by some bundled projects
-    '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
-    # MNN forces __STRICT_ANSI__, which GCC 16 only accepts with GNU extensions off
-    '-DCMAKE_CXX_EXTENSIONS=OFF',
     '-DMNN_BUILD_SHARED_LIBS=OFF',
     '-DMNN_OPENCL=ON',
-    # The MNN Python package imports its training, cv and audio modules unconditionally
+    '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+    '-DCMAKE_CXX_EXTENSIONS=OFF',
     '-DMNN_BUILD_TRAIN=ON',
     '-DMNN_BUILD_OPENCV=ON',
     '-DMNN_IMGCODECS=ON',
     '-DMNN_BUILD_AUDIO=ON',
 )
 
+# MSVC throughout, with the static /MT runtime that upstream's setup.py compiles with
 WINDOWS_CMAKE_OPTIONS = (
     '-DCMAKE_C_COMPILER=cl',
     '-DCMAKE_CXX_COMPILER=cl',
-    # Upstream's setup.py compiles the extension with the static /MT runtime
     '-DMNN_WIN_RUNTIME_MT=ON',
 )
 
@@ -73,6 +74,7 @@ def run(
 ) -> None:
     """Echo and run a command, raising if it fails."""
     arguments = [str(argument) for argument in command]
+
     print('+ ' + ' '.join(arguments), flush=True)
     subprocess.run(arguments, cwd=cwd, env=env, check=True)
 
@@ -101,9 +103,11 @@ def parse_args() -> argparse.Namespace:
 
     if args.jobs < 1:
         parser.error('--jobs must be positive')
+
     if sys.platform not in {'linux', 'win32'}:
         parser.error('Only Linux and Windows are supported; macOS is not yet supported.')
 
+    # Check every tool up front instead of failing halfway through a long build
     tools = ['uv', 'git', 'cmake', 'ninja', *(('cl', 'link', 'rc') if WINDOWS else ('c++',))]
     if missing := [tool for tool in tools if shutil.which(tool) is None]:
         hint = ''
@@ -114,6 +118,7 @@ def parse_args() -> argparse.Namespace:
             )
         parser.error(f'Missing build tools: {", ".join(missing)}.{hint}')
 
+    # MNN's Windows build only supports x64, and mixing architectures fails at link time
     if WINDOWS:
         x64_python = platform.machine().lower() in {'amd64', 'x86_64'} and sys.maxsize > 2**32
         x64_toolchain = os.environ.get('VSCMD_ARG_TGT_ARCH', 'x64').lower() == 'x64'
@@ -121,6 +126,7 @@ def parse_args() -> argparse.Namespace:
             parser.error(
                 'Windows builds need x64 Python, run from the x64 Native Tools Command Prompt.'
             )
+
     return args
 
 
@@ -131,11 +137,13 @@ def prepare_source(source: Path) -> None:
         clone = ['git', 'clone', '--config', 'core.autocrlf=false', '--depth', '1']
         run([*clone, '--branch', MNN_VERSION, MNN_REPOSITORY, source])
 
+    # A reused checkout could be at any commit, and the patches only fit this one
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
     if commit != MNN_COMMIT:
         msg = f'{source} is at {commit}, expected MNN {MNN_VERSION} ({MNN_COMMIT})'
         raise RuntimeError(msg)
 
+    # A patch that only applies in reverse is already in place from an earlier build
     for patch in PATCHES:
         if succeeds(['git', 'apply', '--check', patch], cwd=source):
             run(['git', 'apply', patch], cwd=source)
@@ -153,6 +161,7 @@ def build_python(cache: Path) -> Path:
     version = f'{sys.version_info.major}.{sys.version_info.minor}'
     environment = cache / f'build-env-{version}'
     python = environment / ('Scripts/python.exe' if WINDOWS else 'bin/python')
+
     if not python.is_file():
         run(['uv', 'venv', '--python', version, '--managed-python', environment])
     run(['uv', 'pip', 'install', '--python', python, *WHEEL_BUILD_REQUIREMENTS])
@@ -167,15 +176,18 @@ def build_wheel(source: Path, python: Path, jobs: int) -> Path:
     run(['cmake', '-S', source, '-B', build, '-G', 'Ninja', *options])
     run(['cmake', '--build', build, '--target', 'MNN', '--parallel', str(jobs)])
 
+    # Clear old wheels so the one found below is from this build
     package = source / 'pymnn' / 'pip_package'
     dist = package / 'dist'
     shutil.rmtree(dist, ignore_errors=True)
+
     env = os.environ.copy()
     if WINDOWS:
         # Make setuptools use the MSVC environment that CMake used
         env['DISTUTILS_USE_SDK'] = '1'
     else:
         env['LDFLAGS'] = NOEXECSTACK
+
     setup = [python, 'setup.py', 'build_ext', '--force', 'bdist_wheel', '--deps', 'opencl']
     run(setup, cwd=package, env=env)
 
@@ -183,6 +195,7 @@ def build_wheel(source: Path, python: Path, jobs: int) -> Path:
     if len(wheels) != 1:
         msg = f'Expected one mnn_opencl wheel in {dist}, found {len(wheels)}'
         raise RuntimeError(msg)
+
     return wheels[0]
 
 
@@ -195,12 +208,15 @@ def install_runtime(wheel: Path, root: Path) -> Path:
     target = root / f'mnn-{MNN_VERSION}-{uuid4().hex[:12]}'
     install = ['uv', 'pip', 'install', '--python', sys.executable, '--no-deps']
     run([*install, '--target', target, wheel])
+
+    # Import from the new directory only, so a stale MNN elsewhere cannot pass the test
     smoke_test = (
         'import sys; sys.path.insert(0, sys.argv[1]); '
         'import MNN, MNN.expr, MNN.nn; '
         'assert MNN.__file__.startswith(sys.argv[1]), MNN.__file__'
     )
     run([sys.executable, '-c', smoke_test, target])
+
     return target
 
 
@@ -212,6 +228,8 @@ def activate_runtime(root: Path, target: Path) -> None:
         'source_commit': MNN_COMMIT,
         'compiled_backends': ['OpenCL'],
     }
+
+    # Write beside the real file and rename over it, so the app never reads half a manifest
     temporary = root / f'.active-{uuid4().hex}.json'
     temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     temporary.replace(root / 'active.json')
@@ -226,6 +244,8 @@ def remove_stale_runtimes(root: Path, active: Path) -> None:
             shutil.rmtree(path)
         except OSError as exc:
             print(f'Could not remove old runtime {path}, it will be retried next build: {exc}')
+
+    # Manifests left behind by a build that was interrupted mid-write
     for leftover in root.glob('.active-*.json'):
         leftover.unlink(missing_ok=True)
 
@@ -233,6 +253,7 @@ def remove_stale_runtimes(root: Path, active: Path) -> None:
 def main() -> None:
     """Build, install and activate the OpenCL runtime."""
     args = parse_args()
+
     cache = cache_dir() / f'mnn-{MNN_VERSION}'
     cache.mkdir(parents=True, exist_ok=True)
     source = args.source.resolve() if args.source else cache / 'source'

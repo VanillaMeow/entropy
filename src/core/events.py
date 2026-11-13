@@ -16,6 +16,8 @@ EVENT_PREFIX = '@entropy@'
 
 
 class _Event(BaseModel):
+    """Base for every event: immutable, and strict about unknown fields."""
+
     model_config = ConfigDict(extra='forbid', frozen=True)
 
 
@@ -98,6 +100,7 @@ class Complete(_Event):
     failed: int
 
 
+# The ``event`` field tells pydantic which model to parse a line into
 type WorkerEvent = Annotated[
     ModelDownload
     | ModelReady
@@ -128,4 +131,5 @@ def decode(line: str) -> WorkerEvent | None:
     """
     if not line.startswith(EVENT_PREFIX):
         return None
+
     return _ADAPTER.validate_json(line.removeprefix(EVENT_PREFIX))

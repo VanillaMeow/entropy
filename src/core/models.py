@@ -44,6 +44,12 @@ DEFAULT_MODEL = ModelArtifact(
 )
 DEFAULT_PROFILE = ModelProfile(scale=4)
 
+# Download in small chunks so progress updates stay smooth
+DOWNLOAD_CHUNK = 64 * 1024
+
+# Hash cached files in larger chunks, there is no progress to report
+HASH_CHUNK = 1024 * 1024
+
 
 class ModelInstallError(RuntimeError):
     """The default model could not be downloaded or verified."""
@@ -61,10 +67,15 @@ def ensure_default_model(
     offline. Concurrent instances may download twice but only publish valid bytes.
     """
     artifact = DEFAULT_MODEL
+
+    # Packaged builds ship the model and never download one
     if (bundled := _bundled_directory(directory)) is not None:
         return _bundled_model(bundled, artifact)
+
     directory = directory if directory is not None else data_dir() / 'models'
     destination = directory / artifact.filename
+
+    # A cached file is re-hashed every time, so a damaged copy is replaced
     try:
         directory.mkdir(parents=True, exist_ok=True)
         if not (destination.is_file() and _valid_file(destination, artifact)):
@@ -79,6 +90,8 @@ def _bundled_directory(directory: Path | None) -> Path | None:
     """Where a packaged build ships the model, unless the caller chose a directory."""
     if directory is not None:
         return None
+
+    # The Flatpak sets this, the Windows build keeps models next to the executable
     if configured := os.environ.get('ENTROPY_MODEL_DIR'):
         return Path(configured)
     return Path(sys.executable).parent / 'models' if is_compiled() else None
@@ -87,11 +100,13 @@ def _bundled_directory(directory: Path | None) -> Path | None:
 def _bundled_model(directory: Path, artifact: ModelArtifact) -> Path:
     """Return the shipped model, which must never be replaced by a download."""
     path = directory / artifact.filename
+
     try:
         valid = path.is_file() and _valid_file(path, artifact)
     except OSError as exc:
         msg = 'Could not read the bundled enhancement model.'
         raise ModelInstallError(msg) from exc
+
     if not valid:
         msg = 'The bundled enhancement model is damaged. Reinstall Entropy.'
         raise ModelInstallError(msg)
@@ -111,8 +126,12 @@ def _download(
     ) as stream:
         _receive(artifact, stream, progress)
         stream.close()
+
+        # The model's license travels with it
         license_text = files('src').joinpath('licenses/Real-ESRGAN.txt').read_text(encoding='utf-8')
         destination.with_suffix('.license.txt').write_text(license_text, encoding='utf-8')
+
+        # Renaming within one directory is atomic, so the model appears complete or not at all
         Path(stream.name).replace(destination)
 
 
@@ -123,34 +142,46 @@ def _receive(
     if not artifact.url.startswith('https://'):
         msg = f'Refusing to download the model over a non-HTTPS URL: {artifact.url}'
         raise ModelInstallError(msg)
+
     if progress:
         progress(0, artifact.size)
+
     request = Request(artifact.url, headers={'User-Agent': 'Entropy/0.1'})  # ruff: ignore[suspicious-url-open-usage] - checked above
     digest = hashlib.sha256()
     count = 0
+
     with urlopen(request, timeout=30) as response:  # ruff: ignore[suspicious-url-open-usage] - checked above
+        # A redirect could otherwise quietly downgrade the connection
         if response.geturl().split(':', 1)[0] != 'https':
             msg = 'The model download was redirected to a non-HTTPS URL.'
             raise ModelInstallError(msg)
-        while chunk := response.read(64 * 1024):
+
+        # Stop as soon as the size is exceeded instead of filling the disk
+        while chunk := response.read(DOWNLOAD_CHUNK):
             count += len(chunk)
             if count > artifact.size:
                 msg = 'The model download exceeded its expected size.'
                 raise ModelInstallError(msg)
+
             digest.update(chunk)
             stream.write(chunk)
             if progress:
                 progress(count, artifact.size)
+
     if count != artifact.size or digest.hexdigest() != artifact.sha256:
         msg = 'The model download failed its integrity check. Please retry.'
         raise ModelInstallError(msg)
 
 
 def _valid_file(path: Path, artifact: ModelArtifact) -> bool:
+    """Check a file's size, then its digest, against the artifact."""
+    # The size check is free and catches most partial or wrong files
     if path.stat().st_size != artifact.size:
         return False
+
     digest = hashlib.sha256()
     with path.open('rb') as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+        for chunk in iter(lambda: stream.read(HASH_CHUNK), b''):
             digest.update(chunk)
+
     return digest.hexdigest() == artifact.sha256

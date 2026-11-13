@@ -21,10 +21,13 @@ def configure_file_portal() -> None:
     """
     if sys.platform != 'linux':
         return
+
+    # Asking for a theme Qt cannot load would break every dialog, not just the portal
     plugins = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath))
     if not (plugins / 'platformthemes' / 'libqxdgdesktopportal.so').is_file():
         logger.warning(
             "Qt's xdg-desktop-portal plugin is missing; native portal dialogs unavailable"
         )
         return
+
     os.environ['QT_QPA_PLATFORMTHEME'] = 'xdgdesktopportal'

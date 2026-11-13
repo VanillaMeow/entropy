@@ -28,11 +28,15 @@ class Ui:
     def load(self) -> QQmlApplicationEngine:
         """Load the packaged QML workspace with the typed view model."""
         engine = QQmlApplicationEngine()
+
+        # The engine owns the controller so QML never outlives its view model
         self.controller.setParent(engine)
+
         engine.addImportPath(str(QML))
         engine.addImageProvider(PREVIEW_PROVIDER, PreviewProvider())
         engine.setInitialProperties({'controller': self.controller})
         engine.load(QUrl.fromLocalFile(str(QML / 'Main.qml')))
+
         return engine
 
     def save_settings(self) -> None:
