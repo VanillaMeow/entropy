@@ -94,11 +94,9 @@ are downloaded again; valid files work offline. No images are uploaded. The
 and copied alongside the downloaded model.
 
 On Linux, persistent files normally live under
-`~/.local/share/placeholder-upscaler/`: `models/` for weights and `runtimes/` for
-per-Python native packages. Entropy retains this original storage location and
-settings identity so existing models, GPU runtimes, and preferences remain available
-after the rename. XDG application-data overrides are respected.
-On Windows the same data lives under `%LOCALAPPDATA%\placeholder-upscaler\`.
+`~/.local/share/entropy/`: `models/` for weights and `runtimes/` for
+per-Python native packages. XDG application-data overrides are respected.
+On Windows the same data lives under `%LOCALAPPDATA%\entropy\`.
 
 ## Interface and native file selection
 

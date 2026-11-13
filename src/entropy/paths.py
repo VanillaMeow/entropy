@@ -11,8 +11,7 @@ from platformdirs import user_cache_path, user_data_path
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Kept from before the rename so existing models and runtimes stay available
-APP_DIRECTORY = 'placeholder-upscaler'
+APP_DIRECTORY = 'entropy'
 
 
 def is_compiled() -> bool:

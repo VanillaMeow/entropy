@@ -15,8 +15,8 @@ class Settings:
     """
 
     def __init__(self, store: QSettings | None = None) -> None:
-        # Keep the identity used before the Entropy rename so preferences survive
-        self.store = store or QSettings('PlaceholderUpscaler', 'PlaceholderUpscaler')
+        # Matches the organization and application names the app sets on Qt
+        self.store = store or QSettings('Entropy', 'Entropy')
 
     def get[T: (bool, int, float, str)](self, key: str, default: T) -> T:
         """Return the stored value converted to the default's type, or the default."""
