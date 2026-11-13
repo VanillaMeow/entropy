@@ -8,7 +8,7 @@ from importlib import invalidate_caches
 from pathlib import Path
 from typing import Any
 
-from src.paths import is_compiled, runtime_root
+from entropy.paths import is_compiled, runtime_root
 
 
 def activate_local_runtime() -> dict[str, Any] | None:

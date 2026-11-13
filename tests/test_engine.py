@@ -8,9 +8,9 @@ from typing import Any, Literal
 import numpy as np
 import pytest
 
-from src.worker import engine
-from src.core.config import ModelProfile
-from src.worker.engine import InferenceError, MnnRunner
+from entropy.worker import engine
+from entropy.core.config import ModelProfile
+from entropy.worker.engine import InferenceError, MnnRunner
 
 
 @pytest.mark.parametrize('compiled', [False, True])

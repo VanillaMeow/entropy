@@ -11,8 +11,9 @@ from tempfile import TemporaryDirectory
 from PySide6.QtCore import QLibraryInfo
 
 PROJECT = Path(__file__).resolve().parents[1]
-CONTROLLER = PROJECT / 'src' / 'ui' / 'controller.py'
-QML = PROJECT / 'src' / 'ui' / 'qml'
+PACKAGE = PROJECT / 'src' / 'entropy'
+CONTROLLER = PACKAGE / 'ui' / 'controller.py'
+QML = PACKAGE / 'ui' / 'qml'
 QMLTYPES = QML / 'Upscaler' / 'Backend' / 'backend.qmltypes'
 
 

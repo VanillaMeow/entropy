@@ -90,7 +90,7 @@ The download is pinned to conversion commit
 Downloads use a scratch file and are published only after verifying the exact
 size and SHA-256. Every reuse checks the cached file's integrity. Corrupt files
 are downloaded again; valid files work offline. No images are uploaded. The
-[Real-ESRGAN license](src/licenses/Real-ESRGAN.txt) is included
+[Real-ESRGAN license](src/entropy/licenses/Real-ESRGAN.txt) is included
 and copied alongside the downloaded model.
 
 On Linux, persistent files normally live under
@@ -119,7 +119,7 @@ The PySide6 wheel includes the Qt portal plugin; the desktop needs a running
 `xdg-desktop-portal-kde` or `xdg-desktop-portal-gnome`. When native dialogs are
 unavailable Qt can use its QML fallback; a missing plugin is logged.
 
-The `src` package is split by responsibility:
+The `entropy` package, in `src/entropy`, is split by responsibility:
 
 - `core/` holds pure logic shared by both processes, with no Qt: the request
   model, image tiling, model download, and the typed worker events.
@@ -338,4 +338,4 @@ one at https://mozilla.org/MPL/2.0/.
 Source code is available at https://github.com/jedace07/entropy; each release's
 tag identifies its corresponding source. Bundled third-party dependencies and
 the enhancement model retain their own licenses. The model's
-[Real-ESRGAN license](src/licenses/Real-ESRGAN.txt) is included separately.
+[Real-ESRGAN license](src/entropy/licenses/Real-ESRGAN.txt) is included separately.

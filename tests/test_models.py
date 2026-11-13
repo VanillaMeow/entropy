@@ -10,7 +10,7 @@ from urllib.error import URLError
 
 import pytest
 
-from src.core import models
+from entropy.core import models
 
 
 class Download(BytesIO):

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from src.core.config import ModelProfile, UpscaleRequest
+from entropy.core.config import ModelProfile, UpscaleRequest
 
 
 @pytest.mark.parametrize(

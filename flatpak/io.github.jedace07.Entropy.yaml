@@ -88,7 +88,7 @@ modules:
     build-commands:
       - uv pip install --python=/usr/bin/python3 --prefix=/app --offline --no-index --no-deps --no-build-isolation .
       - install -Dm644 realesr-general-x4v3.mnn /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.mnn
-      - install -Dm644 src/licenses/Real-ESRGAN.txt /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.license.txt
+      - install -Dm644 src/entropy/licenses/Real-ESRGAN.txt /app/share/entropy/models/realesr-general-x4v3-4a8999e30500.license.txt
       - install -Dm644 LICENSE /app/share/licenses/entropy/LICENSE
       - install -Dm644 flatpak/io.github.jedace07.Entropy.desktop /app/share/applications/io.github.jedace07.Entropy.desktop
       - install -Dm644 flatpak/io.github.jedace07.Entropy.svg /app/share/icons/hicolor/scalable/apps/io.github.jedace07.Entropy.svg

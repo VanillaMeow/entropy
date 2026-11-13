@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QStandardPaths, Signal
 
-from src.core.config import UpscaleRequest
-from src.core.events import (
+from entropy.core.config import UpscaleRequest
+from entropy.core.events import (
     Complete,
     Error,
     ImageError,
@@ -23,12 +23,12 @@ from src.core.events import (
     Status,
     WorkerEvent,
 )
-from src.core.imaging import SUPPORTED_SUFFIXES
-from src.core.models import DEFAULT_PROFILE
-from src.logic.image_queue import EntryState, ImageQueue, QueueEntry
+from entropy.core.imaging import SUPPORTED_SUFFIXES
+from entropy.core.models import DEFAULT_PROFILE
+from entropy.logic.image_queue import EntryState, ImageQueue, QueueEntry
 
 if TYPE_CHECKING:
-    from src.application import Entropy
+    from entropy.application import Entropy
 
 # Limits on preferences, which mirror the choices the interface offers
 TILE_SIZES = frozenset({32, 64, 128, 256, 512})

@@ -80,7 +80,7 @@ def fake_deploy(
     config = ConfigParser()
     config.read(command[command.index('--config-file') + 1])
     assert config['nuitka']['mode'] == 'standalone'
-    assert 'src/ui/qml/Main.qml' in config['qt']['qml_files']
+    assert 'entropy/ui/qml/Main.qml' in config['qt']['qml_files']
     assert '--include-package=MNN' in config['nuitka']['extra_args']
     assert '--include-distribution-metadata=entropy' in config['nuitka']['extra_args']
     assert '--windows-console-mode=attach' in config['nuitka']['extra_args']
@@ -94,7 +94,7 @@ def fake_deploy(
     payload.mkdir(parents=True)
     (payload / 'Entropy.exe').write_bytes(b'standalone application')
     shutil.copy2(native / '_mnncengine.pyd', payload / '_mnncengine.pyd')
-    shutil.copytree(cwd / 'src' / 'ui' / 'qml', payload / 'src' / 'ui' / 'qml')
+    shutil.copytree(cwd / 'entropy' / 'ui' / 'qml', payload / 'entropy' / 'ui' / 'qml')
 
     return subprocess.CompletedProcess(command, 0)
 
@@ -130,7 +130,7 @@ def check_payload(data: Path, license_text: bytes) -> None:
     assert (data / 'LICENSE').read_bytes() == license_text
     assert (data / 'Entropy.exe').read_bytes() == b'standalone application'
     assert (data / '_mnncengine.pyd').read_bytes() == b'GPU runtime'
-    assert (data / 'src' / 'ui' / 'qml' / 'Main.qml').is_file()
+    assert (data / 'entropy' / 'ui' / 'qml' / 'Main.qml').is_file()
     assert (data / 'models' / 'model.mnn').read_bytes() == b'verified model'
     assert (data / 'models' / 'model.license.txt').is_file()
 

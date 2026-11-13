@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from src.paths import cache_dir, runtime_root
+from entropy.paths import cache_dir, runtime_root
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

@@ -8,13 +8,13 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src import __main__ as entry_point
-from src import application
-from src.core.config import ModelProfile, UpscaleRequest
-from src.core.events import Complete, ImageError, RuntimeReady, Saved, WorkerEvent, decode
-from src.core.imaging import FloatImage
-from src.worker import engine
-from src.worker import process as worker
+from entropy import __main__ as entry_point
+from entropy import application
+from entropy.core.config import ModelProfile, UpscaleRequest
+from entropy.core.events import Complete, ImageError, RuntimeReady, Saved, WorkerEvent, decode
+from entropy.core.imaging import FloatImage
+from entropy.worker import engine
+from entropy.worker import process as worker
 
 
 def events(output: str) -> list[WorkerEvent]:

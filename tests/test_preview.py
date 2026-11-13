@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from src.ui.preview import ORIENTATION_TAG, image_aspect
+from entropy.ui.preview import ORIENTATION_TAG, image_aspect
 
 
 @pytest.mark.parametrize('orientation,expected', [(1, 3 / 5), (2, 3 / 5), (6, 5 / 3), (8, 5 / 3)])

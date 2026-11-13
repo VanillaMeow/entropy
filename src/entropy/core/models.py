@@ -13,8 +13,8 @@ from typing import IO, TYPE_CHECKING
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from src.core.config import ModelProfile
-from src.paths import data_dir, is_compiled
+from entropy.core.config import ModelProfile
+from entropy.paths import data_dir, is_compiled
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -128,7 +128,8 @@ def _download(
         stream.close()
 
         # The model's license travels with it
-        license_text = files('src').joinpath('licenses/Real-ESRGAN.txt').read_text(encoding='utf-8')
+        license_file = files('entropy') / 'licenses' / 'Real-ESRGAN.txt'
+        license_text = license_file.read_text(encoding='utf-8')
         destination.with_suffix('.license.txt').write_text(license_text, encoding='utf-8')
 
         # Renaming within one directory is atomic, so the model appears complete or not at all

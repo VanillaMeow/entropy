@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import ValidationError
 from PySide6.QtCore import QCoreApplication, QObject, QProcess, QTimer, Signal
 
-from src.core.events import Error, ModelReady, decode
-from src.paths import is_compiled
+from entropy.core.events import Error, ModelReady, decode
+from entropy.paths import is_compiled
 
 if TYPE_CHECKING:
-    from src.core.config import UpscaleRequest
+    from entropy.core.config import UpscaleRequest
 
 type WorkerMode = Literal['probe', 'prepare', 'job']
 
@@ -80,7 +80,7 @@ class WorkerHost(QObject):
         if is_compiled():
             process.start(QCoreApplication.applicationFilePath(), ['--worker', f'--{mode}'])
         else:
-            process.start(sys.executable, ['-u', '-m', 'src', '--worker', f'--{mode}'])
+            process.start(sys.executable, ['-u', '-m', 'entropy', '--worker', f'--{mode}'])
 
         # QProcess buffers the request until the child starts, closing stdin ends it
         if request is not None:

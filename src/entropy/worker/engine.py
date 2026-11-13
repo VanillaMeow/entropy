@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from src.paths import is_compiled
-from src.worker.runtime import activate_local_runtime
+from entropy.paths import is_compiled
+from entropy.worker.runtime import activate_local_runtime
 
 if TYPE_CHECKING:
-    from src.core.config import ModelProfile
-    from src.core.imaging import FloatImage
+    from entropy.core.config import ModelProfile
+    from entropy.core.imaging import FloatImage
 
 # MNN's session mode that keeps the chosen backend primary instead of falling back to CPU
 BACKEND_PRIMARY_MODE = 8

@@ -9,7 +9,7 @@ from PIL import Image, ImageOps
 from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickImageProvider
 
-from src.logic.image_queue import preview_path
+from entropy.logic.image_queue import preview_path
 
 if TYPE_CHECKING:
     from pathlib import Path

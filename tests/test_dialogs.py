@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.ui import dialogs
+from entropy.ui import dialogs
 
 
 def plugins_in(directory: Path) -> Callable[[object], str]:

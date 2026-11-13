@@ -10,13 +10,13 @@ from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtGui import QGuiApplication, QIcon, QWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 
-from src.logic.session import Session
-from src.logic.settings import Settings
-from src.logic.worker_host import WorkerHost
-from src.paths import is_compiled
-from src.ui.dialogs import configure_file_portal
-from src.ui.view import Ui
-from src.version import application_version
+from entropy.logic.session import Session
+from entropy.logic.settings import Settings
+from entropy.logic.worker_host import WorkerHost
+from entropy.paths import is_compiled
+from entropy.ui.dialogs import configure_file_portal
+from entropy.ui.view import Ui
+from entropy.version import application_version
 
 # Some desktops default to fonts too small for the dense queue layout
 MIN_FONT_SIZE = 12

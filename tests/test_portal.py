@@ -21,8 +21,8 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, QTimer, QObject, QMetaObject, Qt, Q_ARG
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuickControls2 import QQuickStyle
-from src.ui.dialogs import configure_file_portal
-from src.application import Entropy
+from entropy.ui.dialogs import configure_file_portal
+from entropy.application import Entropy
 
 configure_file_portal()
 QQuickStyle.setStyle("Material")

@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 
-from src.logic.image_queue import PREVIEW_PROVIDER
-from src.ui.controller import AppController
-from src.ui.preview import PreviewProvider
+from entropy.logic.image_queue import PREVIEW_PROVIDER
+from entropy.ui.controller import AppController
+from entropy.ui.preview import PreviewProvider
 
 if TYPE_CHECKING:
-    from src.application import Entropy
+    from entropy.application import Entropy
 
 QML = Path(__file__).parent / 'qml'
 

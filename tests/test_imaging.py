@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.core.imaging import FloatImage, load_image, save_output, upscale_image
-from src.ui.preview import ORIENTATION_TAG
+from entropy.core.imaging import FloatImage, load_image, save_output, upscale_image
+from entropy.ui.preview import ORIENTATION_TAG
 
 
 class NearestRunner:

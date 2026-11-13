@@ -29,12 +29,12 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
 
-from src.application import Entropy
-from src.core.config import UpscaleRequest
-from src.core.events import Error, ModelReady, RuntimeReady, Saved, WorkerEvent
-from src.logic import worker_host
-from src.logic.worker_host import WorkerHost, WorkerMode
-from src.ui.controller import AppController
+from entropy.application import Entropy
+from entropy.core.config import UpscaleRequest
+from entropy.core.events import Error, ModelReady, RuntimeReady, Saved, WorkerEvent
+from entropy.logic import worker_host
+from entropy.logic.worker_host import WorkerHost, WorkerMode
+from entropy.ui.controller import AppController
 
 # Fixtures
 
@@ -161,7 +161,7 @@ def test_startup_check_loads_workspace_without_model_setup(tmp_path: Path) -> No
     )
 
     result = subprocess.run(
-        [sys.executable, '-m', 'src'],
+        [sys.executable, '-m', 'entropy'],
         cwd=Path(__file__).resolve().parents[1],
         env=environment,
         capture_output=True,

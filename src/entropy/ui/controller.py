@@ -9,11 +9,11 @@ from PySide6.QtCore import Property, QAbstractItemModel, QObject, Qt, QUrl, Sign
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtQml import QmlElement, QmlUncreatable
 
-from src.logic.image_queue import preview_url
-from src.ui.preview import image_aspect
+from entropy.logic.image_queue import preview_url
+from entropy.ui.preview import image_aspect
 
 if TYPE_CHECKING:
-    from src.application import Entropy
+    from entropy.application import Entropy
 
 QML_IMPORT_NAME = 'Upscaler.Backend'
 QML_IMPORT_MAJOR_VERSION = 1

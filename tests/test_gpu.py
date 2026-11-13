@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.core.imaging import upscale_image
-from src.core.models import DEFAULT_PROFILE, ensure_default_model
-from src.worker.engine import MnnRunner, gpu_available, import_mnn
+from entropy.core.imaging import upscale_image
+from entropy.core.models import DEFAULT_PROFILE, ensure_default_model
+from entropy.worker.engine import MnnRunner, gpu_available, import_mnn
 
 
 @pytest.mark.skipif(

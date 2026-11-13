@@ -20,10 +20,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPainter
 from PySide6.QtSvg import QSvgRenderer
 
-from src.core.models import ensure_default_model
-from src.paths import runtime_root
-from src.version import application_version
-from src.worker.runtime import activate_local_runtime
+from entropy.core.models import ensure_default_model
+from entropy.paths import runtime_root
+from entropy.version import application_version
+from entropy.worker.runtime import activate_local_runtime
 
 COMPONENT = 'io.github.jedace07.Entropy'
 
@@ -34,7 +34,7 @@ ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 ENTRY_POINT = '''\
 """Compiled Entropy entry point."""
 
-from src.__main__ import main
+from entropy.__main__ import main
 
 if __name__ == "__main__":
     raise SystemExit(main())
@@ -99,7 +99,7 @@ def write_deploy_spec(staging: Path) -> Path:
 
     qml_files = ','.join(
         path.relative_to(staging).as_posix()
-        for path in sorted((staging / 'src' / 'ui' / 'qml').rglob('*.qml'))
+        for path in sorted((staging / 'entropy' / 'ui' / 'qml').rglob('*.qml'))
     )
 
     # MNN loads its native module by name, which Nuitka cannot see on its own
@@ -149,7 +149,11 @@ def write_deploy_spec(staging: Path) -> Path:
 def deploy_application(project: Path, staging: Path, native: Path) -> Path:
     """Compile an isolated source tree while making the GPU-enabled MNN importable."""
     # Build from a copy, pyside6-deploy writes its output next to the sources
-    shutil.copytree(project / 'src', staging / 'src', ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.copytree(
+        project / 'src' / 'entropy',
+        staging / 'entropy',
+        ignore=shutil.ignore_patterns('__pycache__'),
+    )
     (staging / 'Entropy.py').write_text(ENTRY_POINT, encoding='utf-8')
     create_icon(project / 'flatpak' / f'{COMPONENT}.svg', staging / 'Entropy.ico')
     spec = write_deploy_spec(staging)
@@ -233,7 +237,7 @@ def _lay_out_installer(project: Path, staging: Path, payload: Path) -> Path:
     shutil.copy2(staging / 'Entropy.ico', layout / 'config' / 'Entropy.ico')
     shutil.copy2(project / 'LICENSE', component / 'meta' / 'LICENSE')
     shutil.copy2(
-        project / 'src' / 'licenses' / 'Real-ESRGAN.txt',
+        project / 'src' / 'entropy' / 'licenses' / 'Real-ESRGAN.txt',
         component / 'meta' / 'Real-ESRGAN.txt',
     )
 

@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from src.core.config import UpscaleRequest
-from src.core.events import (
+from entropy.core.config import UpscaleRequest
+from entropy.core.events import (
     Complete,
     Error,
     ImageError,
@@ -29,9 +29,9 @@ from src.core.events import (
     WorkerEvent,
     encode,
 )
-from src.core.imaging import load_image, save_output, upscale_image
-from src.core.models import ensure_default_model
-from src.worker.engine import MnnRunner, gpu_available, import_mnn
+from entropy.core.imaging import load_image, save_output, upscale_image
+from entropy.core.models import ensure_default_model
+from entropy.worker.engine import MnnRunner, gpu_available, import_mnn
 
 if TYPE_CHECKING:
     from pathlib import Path
