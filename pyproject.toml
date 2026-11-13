@@ -38,6 +38,7 @@ windows-build = ["Nuitka==4.1.1", "aqtinstall==3.3.0"]
 
 [project.scripts]
 entropy = "src.__main__:main"
+app = "src.__main__:main"
 
 [tool.pyright]
 typeCheckingMode = "strict"
@@ -151,11 +152,7 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 split-on-trailing-comma = true
 combine-as-imports = true
-# Every module defers annotation evaluation the same way
 required-imports = ["from __future__ import annotations"]
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"contextlib.suppress".msg = "Use an explicit try/except so the swallowed exception is visible."
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
@@ -170,6 +167,9 @@ parametrize-names-type = "csv"
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "single"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"contextlib.suppress".msg = "Use an explicit try/except for performance reasons."
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
